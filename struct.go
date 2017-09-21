@@ -20,7 +20,8 @@ import (
 const Name = "RandShare"
 
 func init() {
-	for _, p := range []interface{}{Announce{}, Reply{}, Commitment{}, StructAnnounce{}, StructReply{}, StructCommitment{}} {
+	for _, p := range []interface{}{Announce{}, Reply{}, Commitment{}, Share{},
+		StructAnnounce{}, StructReply{}, StructCommitment{}, StructShare{}} {
 		network.RegisterMessage(p)
 	}
 }
@@ -45,7 +46,7 @@ type StructAnnounce struct {
 type Reply struct {
 	Src  int
 	Tgt  int
-	Vote *share.PriShare //positive : nil, negative : share
+	Vote share.PriShare //positive : nil, negative : share
 }
 
 // StructReply just contains Reply and the data necessary to identify and
@@ -73,6 +74,18 @@ type Vote struct {
 	NegativeCounter int
 }
 
+type Share struct {
+	Src    int //src
+	Tgt    int //tgt
+	Share  share.PriShare
+	NPrime int
+}
+
+type StructShare struct {
+	*onet.TreeNode
+	Share
+}
+
 type RandShare struct {
 	*onet.TreeNodeInstance
 
@@ -87,14 +100,23 @@ type RandShare struct {
 	//polynomial
 	//polyCommit map[int][]abstract.Point
 
-	//store announces
+	//store announces that we receive
 	announces map[int]*Announce
-	//store replies before sending them
+
+	//store replies before sending them 2.1
 	replies map[int]*Reply
-	//keep track of votes
+
+	//keep track of votes for secret si(0) 2.1 2.3
 	votes map[int]*Vote
-	//vector to keep trace of valid secret received
-	tracker []int
+
+	//keep track of commits before modif of tracker 2.5
+	commits map[int]*Vote
+
+	//vector to keep trace of valid secret received (Vi) 2.5
+	tracker map[int]int
+
+	//store the shares for the recovery
+	shares map[int]*share.PriShare
 
 	Done chan bool
 }
