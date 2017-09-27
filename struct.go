@@ -28,9 +28,10 @@ func init() {
 
 // Announce is used to pass a message to all children.
 type Announce struct {
+	//share   share.PubShare
 	Src     int
 	Tgt     int
-	share   share.PriShare
+	Share   share.PriShare
 	B       abstract.Point
 	Commits []abstract.Point
 }
@@ -57,33 +58,35 @@ type StructReply struct {
 }
 
 type Commitment struct {
-	Src  int //src
-	Tgt  int //tgt
+	Src  int
+	Tgt  int
 	Vote int
 }
 
-// StructReply just contains Reply and the data necessary to identify and
+// StructCommitment just contains Commitment and the data necessary to identify and
 // process the message in the sda framework.
 type StructCommitment struct {
 	*onet.TreeNode
 	Commitment
 }
 
-type Vote struct {
-	PositiveCounter int
-	NegativeCounter int
-}
-
 type Share struct {
-	Src    int //src
-	Tgt    int //tgt
+	Src    int
+	Tgt    int
 	Share  share.PriShare
 	NPrime int
 }
 
+// StructShare just contains Share and the data necessary to identify and
+// process the message in the sda framework.
 type StructShare struct {
 	*onet.TreeNode
 	Share
+}
+
+type Vote struct {
+	PositiveCounter int
+	NegativeCounter int
 }
 
 type RandShare struct {
@@ -94,6 +97,7 @@ type RandShare struct {
 	threshold int
 	purpose   string
 	time      time.Time
+	nPrime    int
 
 	//secret    abstract.Scalar
 
@@ -103,16 +107,16 @@ type RandShare struct {
 	//store announces that we receive
 	announces map[int]*Announce
 
-	//store replies before sending them 2.1
+	//store replies before sending them 2.1 used in HandleAnnounce
 	replies map[int]*Reply
 
-	//keep track of votes for secret si(0) 2.1 2.3
+	//keep track of votes for secret sj(0) used in HandleReply
 	votes map[int]*Vote
 
-	//keep track of commits before modif of tracker 2.5
+	//keep track of commits before modif of tracker used in HandleCommitment
 	commits map[int]*Vote
 
-	//vector to keep trace of valid secret received (Vi) 2.5
+	//vector to keep trace of valid secret received (Vi) 2.5 used in HandleCommitment
 	tracker map[int]int
 
 	//store the shares for the recovery
