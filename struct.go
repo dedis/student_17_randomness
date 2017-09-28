@@ -8,6 +8,7 @@ so that it can find out who sent the message.
 */
 
 import (
+	"sync"
 	"time"
 
 	"gopkg.in/dedis/crypto.v0/abstract"
@@ -90,6 +91,7 @@ type Vote struct {
 }
 
 type RandShare struct {
+	mutex sync.Mutex
 	*onet.TreeNodeInstance
 
 	faulty    int
@@ -98,29 +100,18 @@ type RandShare struct {
 	purpose   string
 	time      time.Time
 	nPrime    int
-
 	//secret    abstract.Scalar
-
-	//polynomial
-	//polyCommit map[int][]abstract.Point
-
 	//store announces that we receive
 	announces map[int]*Announce
-
 	//store replies before sending them 2.1 used in HandleAnnounce
 	replies map[int]*Reply
-
 	//keep track of votes for secret sj(0) used in HandleReply
 	votes map[int]*Vote
-
 	//keep track of commits before modif of tracker used in HandleCommitment
 	commits map[int]*Vote
-
 	//vector to keep trace of valid secret received (Vi) 2.5 used in HandleCommitment
 	tracker map[int]int
-
 	//store the shares for the recovery
 	shares map[int]*share.PriShare
-
-	Done chan bool
+	Done   chan bool
 }

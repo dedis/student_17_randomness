@@ -31,8 +31,6 @@ func (rs *RandShare) Setup(nodes int, faulty int, purpose string) error {
 	rs.nPrime = -1
 	//	rs.secret = secret
 
-	//rs.polyCommit = make(map[int][]abstract.Point)
-
 	rs.announces = make(map[int]*Announce)
 	rs.replies = make(map[int]*Reply)
 	rs.votes = make(map[int]*Vote)
@@ -47,22 +45,15 @@ func (rs *RandShare) Setup(nodes int, faulty int, purpose string) error {
 
 func (rs *RandShare) Start() error {
 	rs.time = time.Now()
-	//log.Lvlf1("randShare strarting")
 
 	//compute priPoly si(x)
-	//g := edwards25519.NewAES128SHA256Ed25519()
-
 	priPoly := share.NewPriPoly(rs.Suite(), rs.threshold, nil, random.Stream)
-
 	//compute shares si(x)
 	shares := priPoly.Shares(rs.nodes)
-
 	//compute pubPoly using commit
 	pubPoly := priPoly.Commit(nil)
-
 	b, commits := pubPoly.Info()
-
-	//send share si(j)
+	//send share si(j) and send it
 	for j := 0; j < rs.nodes; j++ {
 
 		announce := &Announce{
@@ -81,7 +72,6 @@ func (rs *RandShare) Start() error {
 			rs.announces[j] = announce
 		}
 	}
-
 	return nil
 }
 
@@ -89,7 +79,7 @@ func (rs *RandShare) HandleAnnounce(announce StructAnnounce) error {
 
 	msg := &announce.Announce
 
-	if rs.nodes == 0 { // if it's our first message, we do our stuff before anwsering
+	if rs.nodes == 0 { // if it's our first message, we send our shares before anwsering
 		//setup of our node
 		nodes := len(rs.List())
 		if err := rs.Setup(nodes, nodes/3, ""); err != nil {
@@ -120,20 +110,15 @@ func (rs *RandShare) HandleAnnounce(announce StructAnnounce) error {
 	}
 
 	//now we can handle the announce
-
 	rs.announces[msg.Src] = msg
-
 	reply := &Reply{Src: rs.Index(), Tgt: msg.Src}
 
 	PubPoly := share.NewPubPoly(rs.Suite(), msg.B, msg.Commits)
 	shareIsCorrect := PubPoly.Check(&msg.Share)
-
 	if !shareIsCorrect {
 		reply.Vote = msg.Share
 	}
-
 	rs.replies[msg.Src] = reply
-
 	if len(rs.replies) == (rs.nodes - 1) { //if each share arrived, we send them
 		for j := 0; j < rs.nodes; j++ {
 			if j != rs.Index() {
@@ -162,7 +147,6 @@ func (rs *RandShare) HandleReply(reply StructReply) error {
 
 	//by default vote is neg
 	commit := &Commitment{Src: rs.Index(), Tgt: msg.Tgt}
-
 	if rs.votes[msg.Tgt].PositiveCounter > 2*rs.faulty {
 		commit.Vote = 1
 		if err := rs.Broadcast(commit); err != nil {
@@ -181,7 +165,6 @@ func (rs *RandShare) HandleReply(reply StructReply) error {
 func (rs *RandShare) HandleCommitment(commitment StructCommitment) error {
 
 	msg := &commitment.Commitment
-	//log.Lvlf1("node %+v received the commit %+v", rs.Index(), msg)
 
 	if _, ok := rs.commits[msg.Tgt]; !ok {
 		rs.commits[msg.Tgt] = &Vote{PositiveCounter: 0, NegativeCounter: 0}
@@ -201,7 +184,7 @@ func (rs *RandShare) HandleCommitment(commitment StructCommitment) error {
 
 	if (len(rs.tracker) == (rs.nodes)) && (rs.nPrime == -1) { // we have all entries in the tracker and didn't send the share already
 		rs.nPrime = 0
-		//we count how many 1s
+		//we count how many 1s in our tracker
 		for j := 0; j < rs.nodes; j++ {
 			if rs.tracker[j] == 1 {
 				rs.nPrime += 1
@@ -212,7 +195,6 @@ func (rs *RandShare) HandleCommitment(commitment StructCommitment) error {
 			share.Tgt = j
 			if rs.tracker[j] == 1 {
 				share.Share = rs.announces[j].Share
-				//log.LLvlf1("sending the share %+v", share)
 				//we send the share sj(i) to the root so that we can reconstruct the collective random string
 				if err := rs.SendTo(rs.List()[0], share); err != nil {
 					return err
