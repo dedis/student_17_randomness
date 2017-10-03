@@ -111,7 +111,9 @@ type RandShare struct {
 	commits map[int]*Vote
 	//vector to keep trace of valid secret received (Vi) 2.5 used in HandleCommitment
 	tracker map[int]int
-	//store the shares for the recovery
-	shares map[int]*share.PriShare
-	Done   chan bool
+	//store the shares for the recovery of the secret sj(0)
+	shares map[int]map[int]*share.PriShare
+	//store the recovered secrets to compute the collective random string
+	secrets map[int]*abstract.Scalar
+	Done    chan bool
 }

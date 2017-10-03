@@ -13,8 +13,11 @@ func TestRandShare(t *testing.T) {
 	var name = "RandShare"
 	var nodes int = 5
 	var faulty = 1
+	/*
+		var nodes int = 3
+		var faulty = 2
+	*/
 	var purpose string = "RandShare test run"
-	//var secret kyber.Scalar = kyber.Scalar.Pick(nil, random.Stream) //???
 
 	local := onet.NewLocalTest()
 	_, _, tree := local.GenTree(nodes, true)
