@@ -72,7 +72,7 @@ func TestRandShare(t *testing.T) {
 	case <-time.After(time.Second * time.Duration(nodes) * 2):
 		t.Fatal("RandShare timeout")
 	}
-}
+}*/
 
 func TestRandShareScale(t *testing.T) {
 
@@ -106,4 +106,3 @@ func TestRandShareScale(t *testing.T) {
 		t.Fatal("RandShare timeout")
 	}
 }
-**/

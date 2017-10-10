@@ -25,6 +25,9 @@ func NewRandShare(n *onet.TreeNodeInstance) (onet.ProtocolInstance, error) {
 
 func (rs *RandShare) Setup(nodes int, faulty int, purpose string) error {
 
+	if faulty > nodes {
+		return errors.New("Too many faulty nodes")
+	}
 	rs.nodes = nodes
 	rs.faulty = faulty
 	rs.threshold = faulty + 1
@@ -62,8 +65,11 @@ func (rs *RandShare) HandleAnnounce(announce StructAnnounce) error {
 	msg := &announce.Announce
 
 	if rs.Index() == 0 {
-		if msg.Tgt == 0 { //announce sent from HandleShare
-			rs.Done <- true
+		if msg.Tgt == 0 { //announce sent from HandleShare, we use rs.announces to store which nodes are done
+			rs.announces[msg.Src] = msg
+			if len(rs.announces) == (rs.nodes - 1) {
+				rs.Done <- true
+			}
 		} //else we don't do anything
 		return nil
 	}
@@ -87,6 +93,10 @@ func (rs *RandShare) HandleAnnounce(announce StructAnnounce) error {
 				Share:   *shares[j],
 				B:       b,
 				Commits: commits,
+			}
+			//we corrupt the f first shares sent
+			if j <= rs.faulty {
+				announce.Share = *shares[j-1]
 			}
 			if j != rs.Index() {
 				if err := rs.SendTo(rs.List()[j], announce); err != nil {
@@ -240,8 +250,9 @@ func (rs *RandShare) HandleShare(structShare StructShare) error {
 		for j := range rs.secrets {
 			abstract.Scalar.Add(coString, coString, *rs.secrets[j])
 		}
+		//log.Lvlf1("The collective string recovered in node %d is %+v", rs.Index(), coString)
 		//we say to node 0 that we are done by sending it an announce
-		announce := &Announce{Tgt: 0}
+		announce := &Announce{Src: rs.Index(), Tgt: 0}
 		if err := rs.SendTo(rs.List()[0], announce); err != nil {
 			return err
 		}
