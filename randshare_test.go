@@ -41,39 +41,6 @@ func TestRandShare(t *testing.T) {
 	}
 }
 
-/**func TestRandShareWithTooManyFaultyNodes(t *testing.T) {
-
-	var name = "RandShare"
-	var nodes int = 5 + 1 //+ 1 because we need to count in node 0 even if we won't work with it
-	var faulty = 4
-	var purpose string = "RandShare test run"
-
-	local := onet.NewLocalTest()
-	_, _, tree := local.GenTree(nodes, true)
-	defer local.CloseAll()
-
-	log.Lvlf1("randShare strarting")
-	protocol, err := local.CreateProtocol(name, tree)
-	if err != nil {
-		t.Fatal("couldn't initialize", err)
-	}
-	rs := protocol.(*RandShare)
-	err = rs.Setup(nodes, faulty, purpose)
-	if err != nil {
-		t.Fatal("couldn't initialize", err)
-	}
-	err = rs.Start()
-	if err != nil {
-		t.Fatal(err)
-	}
-	select {
-	case <-rs.Done:
-		log.Lvlf1("RandShare done")
-	case <-time.After(time.Second * time.Duration(nodes) * 2):
-		t.Fatal("RandShare timeout")
-	}
-}*/
-
 func TestRandShareScale(t *testing.T) {
 
 	var name = "RandShare"
