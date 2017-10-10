@@ -19,7 +19,7 @@ func TestRandShare(t *testing.T) {
 	_, _, tree := local.GenTree(nodes, true)
 	defer local.CloseAll()
 
-	log.Lvlf1("randShare strarting")
+	log.Lvlf1("randShare starting")
 	protocol, err := local.CreateProtocol(name, tree)
 	if err != nil {
 		t.Fatal("couldn't initialize", err)
@@ -85,7 +85,7 @@ func TestRandShareScale(t *testing.T) {
 	_, _, tree := local.GenTree(nodes, true)
 	defer local.CloseAll()
 
-	log.Lvlf1("randShare strarting")
+	log.Lvlf1("randShare starting")
 	protocol, err := local.CreateProtocol(name, tree)
 	if err != nil {
 		t.Fatal("couldn't initialize", err)
