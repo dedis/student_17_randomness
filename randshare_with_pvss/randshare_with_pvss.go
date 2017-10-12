@@ -8,7 +8,7 @@ import (
 	"gopkg.in/dedis/crypto.v0/random"
 	"gopkg.in/dedis/crypto.v0/share"
 	"gopkg.in/dedis/onet.v1"
-	//"gopkg.in/dedis/onet.v1/log"
+	"gopkg.in/dedis/onet.v1/log"
 )
 
 func init() {
@@ -241,7 +241,7 @@ func (rs *RandShare) HandleShare(structShare StructShare) error {
 		for j := range rs.secrets {
 			abstract.Scalar.Add(coString, coString, *rs.secrets[j])
 		}
-		//log.Lvlf1("Costring recovered at node %d is %+v", rs.Index(), coString)
+		log.Lvlf1("Costring recovered at node %d is %+v", rs.Index(), coString)
 		rs.coStringReady = true
 		rs.Done <- true
 	}
