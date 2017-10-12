@@ -11,7 +11,7 @@ import (
 func TestRandShare(t *testing.T) {
 
 	var name = "RandShare"
-	var nodes int = 5 + 1 //+ 1 because we need to count in node 0 even if we won't work with it
+	var nodes int = 5
 	var faulty = 1
 	var purpose string = "RandShare test run"
 
@@ -41,7 +41,7 @@ func TestRandShare(t *testing.T) {
 	}
 }
 
-func TestRandShareScale(t *testing.T) {
+/*func TestRandShareScale(t *testing.T) {
 
 	var name = "RandShare"
 	var nodes int = 15 + 1 //+ 1 because we need to count in node 0 even if we won't work with it
@@ -72,4 +72,4 @@ func TestRandShareScale(t *testing.T) {
 	case <-time.After(time.Second * time.Duration(nodes) * 2):
 		t.Fatal("RandShare timeout")
 	}
-}
+}*/

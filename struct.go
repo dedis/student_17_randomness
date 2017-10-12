@@ -114,6 +114,7 @@ type RandShare struct {
 	//store the shares for the recovery of the secret sj(0)
 	shares map[int]map[int]*share.PriShare
 	//store the recovered secrets to compute the collective random string
-	secrets map[int]*abstract.Scalar
-	Done    chan bool
+	secrets       map[int]*abstract.Scalar
+	coStringReady bool
+	Done          chan bool
 }

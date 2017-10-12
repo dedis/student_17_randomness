@@ -8,6 +8,7 @@ import (
 	"gopkg.in/dedis/crypto.v0/random"
 	"gopkg.in/dedis/crypto.v0/share"
 	"gopkg.in/dedis/onet.v1"
+	"gopkg.in/dedis/onet.v1/log"
 )
 
 func init() {
@@ -25,9 +26,6 @@ func NewRandShare(n *onet.TreeNodeInstance) (onet.ProtocolInstance, error) {
 
 func (rs *RandShare) Setup(nodes int, faulty int, purpose string) error {
 
-	if faulty > nodes {
-		return errors.New("Too many faulty nodes")
-	}
 	rs.nodes = nodes
 	rs.faulty = faulty
 	rs.threshold = faulty + 1
@@ -42,19 +40,39 @@ func (rs *RandShare) Setup(nodes int, faulty int, purpose string) error {
 	rs.shares = make(map[int]map[int]*share.PriShare)
 	rs.secrets = make(map[int]*abstract.Scalar)
 
-	rs.Done = make(chan bool, 1)
+	rs.coStringReady = false
+	rs.Done = make(chan bool, 0)
 
 	return nil
 }
 
-//the methode start
 func (rs *RandShare) Start() error {
 	rs.time = time.Now()
-	//we need to send a special announce to other nodes to start the process as we don't have any share to send
-	for j := 1; j < rs.nodes; j++ {
-		announce := &Announce{Src: rs.Index()}
-		if err := rs.SendTo(rs.List()[j], announce); err != nil {
-			return err
+
+	//compute priPoly si(x)
+	priPoly := share.NewPriPoly(rs.Suite(), rs.threshold, nil, random.Stream)
+	//compute shares si(x)
+	shares := priPoly.Shares(rs.nodes)
+	//compute pubPoly using commit
+	pubPoly := priPoly.Commit(nil)
+	b, commits := pubPoly.Info()
+
+	//send share si(j) and send it
+	for j := 0; j < rs.nodes; j++ {
+
+		announce := &Announce{
+			Src:     rs.Index(),
+			Tgt:     j,
+			Share:   *shares[j],
+			B:       b,
+			Commits: commits,
+		}
+		if j != rs.Index() {
+			if err := rs.SendTo(rs.List()[j], announce); err != nil {
+				return err
+			}
+		} else {
+			rs.announces[j] = announce
 		}
 	}
 	return nil
@@ -64,20 +82,10 @@ func (rs *RandShare) HandleAnnounce(announce StructAnnounce) error {
 
 	msg := &announce.Announce
 
-	if rs.Index() == 0 {
-		if msg.Tgt == 0 { //announce sent from HandleShare, we use rs.announces to store which nodes are done
-			rs.announces[msg.Src] = msg
-			if len(rs.announces) == (rs.nodes - 1) {
-				rs.Done <- true
-			}
-		} //else we don't do anything
-		return nil
-	}
-
-	if rs.nodes == 0 { // if it's our first message, we set up rs and send our shares
+	if rs.nodes == 0 { // if it's our first message, we set up rs and send our shares before anwsering
 		//setup of our node
 		nodes := len(rs.List())
-		if err := rs.Setup(nodes, (nodes-1)/3, ""); err != nil {
+		if err := rs.Setup(nodes, nodes/3, ""); err != nil {
 			return err
 		}
 		//sending our announce
@@ -86,17 +94,13 @@ func (rs *RandShare) HandleAnnounce(announce StructAnnounce) error {
 		pubPoly := priPoly.Commit(nil)
 		b, commits := pubPoly.Info()
 
-		for j := 1; j < rs.nodes; j++ {
+		for j := 0; j < rs.nodes; j++ {
 			announce := &Announce{
 				Src:     rs.Index(),
 				Tgt:     j,
 				Share:   *shares[j],
 				B:       b,
 				Commits: commits,
-			}
-			//we corrupt the f first shares sent
-			if j <= rs.faulty {
-				announce.Share = *shares[j-1]
 			}
 			if j != rs.Index() {
 				if err := rs.SendTo(rs.List()[j], announce); err != nil {
@@ -107,10 +111,8 @@ func (rs *RandShare) HandleAnnounce(announce StructAnnounce) error {
 			}
 		}
 	}
-	if msg.Src == 0 { // we don't deal with the share from node 0
-		return nil
-	}
-	//we handle the announce
+
+	//now we can handle the announce
 	rs.announces[msg.Src] = msg
 	reply := &Reply{Src: rs.Index(), Tgt: msg.Src}
 
@@ -120,8 +122,8 @@ func (rs *RandShare) HandleAnnounce(announce StructAnnounce) error {
 		reply.Vote = msg.Share
 	}
 	rs.replies[msg.Src] = reply
-	if len(rs.replies) == (rs.nodes - 2) { //if each share arrived, we send them (-1 for yourself, -1 for node 0)
-		for j := 1; j < rs.nodes; j++ {
+	if len(rs.replies) == (rs.nodes - 1) { //if each share arrived, we send them
+		for j := 0; j < rs.nodes; j++ {
 			if j != rs.Index() {
 				if err := rs.Broadcast(rs.replies[j]); err != nil {
 					return err
@@ -133,10 +135,6 @@ func (rs *RandShare) HandleAnnounce(announce StructAnnounce) error {
 }
 
 func (rs *RandShare) HandleReply(reply StructReply) error {
-
-	if rs.Index() == 0 {
-		return nil
-	}
 
 	msg := &reply.Reply
 
@@ -169,10 +167,6 @@ func (rs *RandShare) HandleReply(reply StructReply) error {
 
 func (rs *RandShare) HandleCommitment(commitment StructCommitment) error {
 
-	if rs.Index() == 0 {
-		return nil
-	}
-
 	msg := &commitment.Commitment
 
 	if _, ok := rs.commits[msg.Tgt]; !ok {
@@ -191,10 +185,10 @@ func (rs *RandShare) HandleCommitment(commitment StructCommitment) error {
 		rs.tracker[msg.Tgt] = 0
 	}
 
-	if (len(rs.tracker) == (rs.nodes - 1)) && (rs.nPrime == -1) { // we have all entries in the tracker and didn't send the share already
+	if (len(rs.tracker) == (rs.nodes)) && (rs.nPrime == -1) { // we have all entries in the tracker and didn't send the share already
 		rs.nPrime = 0
 		//we count how many 1s in our tracker
-		for j := 1; j < rs.nodes; j++ {
+		for j := 0; j < rs.nodes; j++ {
 			if rs.tracker[j] == 1 {
 				rs.nPrime += 1
 			}
@@ -203,7 +197,7 @@ func (rs *RandShare) HandleCommitment(commitment StructCommitment) error {
 			return errors.New("aborted, not enough secure nodes")
 		}
 		share := &Share{Tgt: rs.Index(), NPrime: rs.nPrime} //sj(i) the share sent to i by j
-		for j := 1; j < rs.nodes; j++ {
+		for j := 0; j < rs.nodes; j++ {
 			if rs.tracker[j] == 1 {
 				share.Src = j
 				share.Share = rs.announces[j].Share
@@ -218,10 +212,6 @@ func (rs *RandShare) HandleCommitment(commitment StructCommitment) error {
 }
 
 func (rs *RandShare) HandleShare(structShare StructShare) error {
-
-	if rs.Index() == 0 {
-		return nil
-	}
 
 	msg := &structShare.Share
 
@@ -238,6 +228,7 @@ func (rs *RandShare) HandleShare(structShare StructShare) error {
 			sharesList[i] = rs.shares[msg.Src][s]
 			i++
 		}
+
 		secret, err := share.RecoverSecret(rs.Suite(), sharesList, rs.threshold, msg.NPrime)
 		if err != nil {
 			return err
@@ -245,17 +236,15 @@ func (rs *RandShare) HandleShare(structShare StructShare) error {
 		rs.secrets[msg.Src] = &secret
 	}
 
-	if len(rs.secrets) == rs.nPrime {
+	if (len(rs.secrets) == rs.nPrime) && !rs.coStringReady {
 		coString := rs.Suite().Scalar().Zero()
 		for j := range rs.secrets {
 			abstract.Scalar.Add(coString, coString, *rs.secrets[j])
 		}
-		//log.Lvlf1("The collective string recovered in node %d is %+v", rs.Index(), coString)
-		//we say to node 0 that we are done by sending it an announce
-		announce := &Announce{Src: rs.Index(), Tgt: 0}
-		if err := rs.SendTo(rs.List()[0], announce); err != nil {
-			return err
-		}
+		log.Lvlf1("Costring recovered at node %d is %+v", rs.Index(), coString)
+		rs.coStringReady = true
+		rs.Done <- true
 	}
+
 	return nil
 }
