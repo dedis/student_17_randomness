@@ -220,7 +220,7 @@ func (rs *RandShare) HandleShare(structShare StructShare) error {
 	}
 	rs.shares[msg.Src][msg.Tgt] = &msg.Share
 
-	if len(rs.shares[msg.Src]) > rs.threshold { //if we collected enough shares to recover sj(0)
+	if len(rs.shares[msg.Src]) >= rs.threshold { //if we collected enough shares to recover sj(0)
 		//gathering shares sj() in a list
 		sharesList := make([]*share.PriShare, len(rs.shares[msg.Src]))
 		i := 0
