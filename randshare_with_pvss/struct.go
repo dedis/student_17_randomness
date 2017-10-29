@@ -13,6 +13,8 @@ import (
 
 	"gopkg.in/dedis/crypto.v0/abstract"
 	"gopkg.in/dedis/crypto.v0/share/pvss"
+
+	"gopkg.in/dedis/crypto.v0/share"
 	"gopkg.in/dedis/onet.v1"
 	"gopkg.in/dedis/onet.v1/network"
 )
@@ -30,10 +32,9 @@ func init() {
 // Announce is used to pass a message to all children.
 type A1 struct {
 	Src     int
-	Tgt     int
 	B       abstract.Point
-	Commits []abstract.Point
-	Share   *pvss.PubVerShare //share   share.PubShare
+	Commits []abstract.Point  //B and Commits to reconstruct pubPoly
+	Share   *pvss.PubVerShare //encShare s_Src,Tgt
 }
 
 // StructAnnounce just contains Announce and the data necessary to identify and
@@ -45,9 +46,8 @@ type StructA1 struct {
 
 // Reply returns the count of all children.
 type R1 struct {
-	Src         int
-	Tgt         int
-	PubVerShare *pvss.PubVerShare //positive : nil, negative : share
+	Src    int
+	Shares map[int]*pvss.PubVerShare //decShares of node Src
 }
 
 // StructReply just contains Reply and the data necessary to identify and
@@ -61,16 +61,17 @@ type RandShare struct {
 	mutex sync.Mutex
 	*onet.TreeNodeInstance
 
-	faulty    int
-	nodes     int
-	threshold int
-	purpose   string
-	time      time.Time
-	X         []abstract.Point //pub keys
-	encShares map[int]map[int]*pvss.PubVerShare
-	decShares map[int]map[int]*pvss.PubVerShare
-	//store the recovered secrets to compute the collective random string
-	secrets       map[int]abstract.Point
+	faulty        int
+	nodes         int
+	threshold     int
+	purpose       string
+	time          time.Time
+	pubPoly       *share.PubPoly
+	X             []abstract.Point                  //pub keys
+	encShares     map[int]map[int]*pvss.PubVerShare //[src][tgt]
+	tracker       map[int]byte
+	decShares     map[int]map[int]*pvss.PubVerShare //[src][tgt]
+	secrets       map[int]abstract.Point            //store the recovered secrets to compute the collective random string
 	coStringReady bool
 	Done          chan bool
 }
