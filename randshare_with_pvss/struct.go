@@ -47,7 +47,7 @@ type StructA1 struct {
 // Reply returns the count of all children.
 type R1 struct {
 	Src    int
-	Shares map[int]*pvss.PubVerShare //decShares of node Src
+	Shares []*pvss.PubVerShare //decShares of node Src
 }
 
 // StructReply just contains Reply and the data necessary to identify and
