@@ -66,7 +66,7 @@ type RandShare struct {
 	threshold     int
 	purpose       string
 	time          time.Time
-	pubPoly       *share.PubPoly
+	pubPolys      []*share.PubPoly                  // i store all of the pubPolys and evaluate at my index to constrcut values
 	X             []abstract.Point                  //pub keys
 	encShares     map[int]map[int]*pvss.PubVerShare //[src][tgt]
 	tracker       map[int]byte
