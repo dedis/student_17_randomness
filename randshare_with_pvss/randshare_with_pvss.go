@@ -154,14 +154,16 @@ func (rs *RandShare) HandleA1(announce StructA1) error {
 		if err != nil {
 			return err
 		}
+
 		//they are correct we store them
 		for j := 0; j < len(validDecShares); j++ {
+
+			//how to go from j to share-src ? : eval pub[j] at rs.Index and see if ==
 			if _, ok := rs.decShares[j]; !ok {
 				rs.decShares[j] = make(map[int]*pvss.PubVerShare)
 			}
 			rs.decShares[j][rs.Index()] = validDecShares[j]
 		}
-		log.LLvlf1("index %d, encshares %+v, correct %+v, dec %+v", rs.Index(), rs.encShares, validDecShares, rs.decShares) //the list of shares of the rs.Index()-th column
 
 		//we brodcast our decShares
 		reply := &R1{Src: rs.Index(), Shares: validDecShares}
@@ -174,23 +176,16 @@ func (rs *RandShare) HandleA1(announce StructA1) error {
 
 func (rs *RandShare) HandleR1(reply StructR1) error {
 	msg := &reply.R1
-	log.LLvlf1("msg %+v", msg)
-	//we store the correct decShares
-	for j := 0; j < len(msg.Shares); j++ {
-		/*if err := pvss.VerifyDecShare(rs.Suite(), nil, rs.X[msg.Src], rs.encShares[j][msg.Src], msg.Shares[j]); err != nil {
-			log.LLvl1("lol")
-			return err
-		}
-		//decShare is correct we store it*/
 
+	//we store all the decShares (we don't have to verify as it will be in the RecoverSecret function)
+	for j := 0; j < len(msg.Shares); j++ {
 		if _, ok := rs.decShares[j]; !ok {
 			rs.decShares[j] = make(map[int]*pvss.PubVerShare)
 		}
 		rs.decShares[j][msg.Src] = msg.Shares[j]
 
-		if len(rs.decShares[j]) == rs.nodes { //the line is full : we recover secret
+		if len(rs.decShares[j]) == rs.nodes { //the line is full : we recover j-th secret
 
-			log.Lvlf1("Getting here")
 			var encShareList []*pvss.PubVerShare
 			var decShareList []*pvss.PubVerShare
 			for i := 0; i < rs.nodes; i++ {
@@ -201,7 +196,6 @@ func (rs *RandShare) HandleR1(reply StructR1) error {
 
 			secret, err := pvss.RecoverSecret(rs.Suite(), nil, rs.X, encShareList, decShareList, rs.threshold, rs.nodes)
 			if err != nil {
-				log.LLvlf1("len(encShareList) %d, len(msg.Shares) %d versus threshold %d", len(encShareList), len(msg.Shares), rs.threshold)
 				return err
 			}
 			rs.secrets[j] = secret
