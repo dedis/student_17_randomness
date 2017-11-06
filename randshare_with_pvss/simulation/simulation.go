@@ -13,14 +13,15 @@ func init() {
 	onet.SimulationRegister("RandShare", NewRSSimulation)
 }
 
-// RHSimulation implements a RandHound simulation
+// RHSimulation implements a RansShare simulation
 type RSSimulation struct {
 	onet.SimulationBFTree
+	Servers int
 	Faulty  int
 	Purpose string
 }
 
-// NewRHSimulation creates a new RandHound simulation
+// NewRHSimulation creates a new RansShare simulation
 func NewRSSimulation(config string) (onet.Simulation, error) {
 	rss := &RSSimulation{}
 	_, err := toml.Decode(config, rss)
@@ -30,7 +31,7 @@ func NewRSSimulation(config string) (onet.Simulation, error) {
 	return rss, nil
 }
 
-// Setup configures a RandHound simulation with certain parameters
+// Setup configures a RansShare simulation with certain parameters
 func (rss *RSSimulation) Setup(dir string, hosts []string) (*onet.SimulationConfig, error) {
 	sim := new(onet.SimulationConfig)
 	rss.CreateRoster(sim, hosts, 2000)
@@ -38,7 +39,7 @@ func (rss *RSSimulation) Setup(dir string, hosts []string) (*onet.SimulationConf
 	return sim, err
 }
 
-// Run initiates a RandHound simulation
+// Run initiates a RansShare simulation
 func (rss *RSSimulation) Run(config *onet.SimulationConfig) error {
 	randM := monitor.NewTimeMeasure("tgen-randshare")
 	bandW := monitor.NewCounterIOMeasure("bw-randshare", config.Server)
@@ -75,8 +76,8 @@ func (rss *RSSimulation) Run(config *onet.SimulationConfig) error {
 		verifyM.Record()
 		log.Lvlf1("RandShare - verification: ok")
 
-		//case <-time.After(time.Second * time.Duration(rhs.Hosts) * 5):
-		//log.Print("RandHound - time out")
+		case <-time.After(time.Second * time.Duration(rhs.Hosts) * 5):
+		log.Print("RansShare - time out")
 	}
 
 	return nil
