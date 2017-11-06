@@ -1,0 +1,6 @@
+Servers = 4
+Simulation = "RandShare"
+BF = 2
+Rounds = 1
+Faulty = 0
+Purpose = "RandShare Test"
