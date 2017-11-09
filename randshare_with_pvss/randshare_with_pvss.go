@@ -1,6 +1,7 @@
 package randsharepvss
 
 import (
+	"bytes"
 	"errors"
 	"time"
 
@@ -47,7 +48,7 @@ func (rs *RandShare) Setup(nodes int, faulty int, purpose string) error {
 
 func (rs *RandShare) Start() error {
 
-	rs.time = time.Now()
+	rs.time = time.Now().Unix() // time.Now.Unix()
 
 	encShares, pubPoly, err := pvss.EncShares(rs.Suite(), nil, rs.X, nil, rs.threshold)
 	if err != nil {
@@ -242,11 +243,13 @@ func (rs *RandShare) Random() ([]byte, *Transcript, error) {
 		return nil, nil, err
 	}
 	transcript := &Transcript{
+		Suite:     rs.Suite(),
 		Nodes:     rs.nodes,
 		Faulty:    rs.faulty,
 		Purpose:   rs.purpose,
 		Time:      rs.time,
 		X:         rs.X,
+		PubPolys:  rs.pubPolys,
 		EncShares: rs.encShares,
 		DecShares: rs.decShares,
 		secrets:   rs.secrets,
@@ -255,6 +258,56 @@ func (rs *RandShare) Random() ([]byte, *Transcript, error) {
 }
 
 func (rs *RandShare) Verify(random []byte, transcript *Transcript) error {
+
+	//verification of encrypted Shares
+	for rowId, encShareMap := range transcript.EncShares {
+		for colId, encShare := range encShareMap {
+			if err := pvss.VerifyEncShare(transcript.Suite, nil, transcript.X[rowId], transcript.PubPolys[colId].Eval(colId).V, encShare); err != nil {
+				return err
+			}
+		}
+	}
+
+	//verification of decrypted shares
+	for rowId, decShareMap := range transcript.DecShares {
+		for colId, share := range decShareMap {
+			if err := pvss.VerifyDecShare(transcript.Suite, nil, transcript.X[rowId], transcript.EncShares[rowId][colId], share); err != nil {
+				return err
+			}
+		}
+	}
+
+	//verification of secrets
+	for s := range transcript.secrets {
+		var encShareList []*pvss.PubVerShare
+		var decShareList []*pvss.PubVerShare
+		for i := 0; i < rs.nodes; i++ {
+			encShareList = append(encShareList, transcript.EncShares[s][i])
+			decShareList = append(decShareList, transcript.DecShares[s][i])
+		}
+
+		secret, err := pvss.RecoverSecret(transcript.Suite, nil, transcript.X, encShareList, decShareList, transcript.Faulty+1, transcript.Nodes)
+		if err != nil {
+			return err
+		}
+		if secret != transcript.secrets[s] {
+			return errors.New("Secret recovered is not correct")
+		}
+	}
+
+	//verification of the final coString
+	coString := transcript.Suite.Point().Null()
+	for j := range transcript.secrets {
+		abstract.Point.Add(coString, coString, transcript.secrets[j])
+	}
+	bs, err := coString.MarshalBinary()
+	if err != nil {
+		return err
+	}
+
+	if bytes.Equal(bs, random) {
+		return errors.New("CoString isn't correct")
+	}
 
 	return nil
 }

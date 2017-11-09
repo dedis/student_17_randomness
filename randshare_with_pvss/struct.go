@@ -9,7 +9,6 @@ so that it can find out who sent the message.
 
 import (
 	"sync"
-	"time"
 
 	"gopkg.in/dedis/crypto.v0/abstract"
 	"gopkg.in/dedis/crypto.v0/share/pvss"
@@ -58,12 +57,14 @@ type StructR1 struct {
 }
 
 type Transcript struct {
+	Suite     abstract.Suite
 	Nodes     int
 	Faulty    int
 	Purpose   string
-	Time      time.Time
+	Time      int64
 	X         []abstract.Point
 	EncShares map[int]map[int]*pvss.PubVerShare
+	PubPolys  []*share.PubPoly
 	DecShares map[int]map[int]*pvss.PubVerShare
 	secrets   map[int]abstract.Point
 }
@@ -76,7 +77,7 @@ type RandShare struct {
 	nodes         int
 	threshold     int
 	purpose       string
-	time          time.Time
+	time          int64
 	pubPolys      []*share.PubPoly                  // i store all of the pubPolys and evaluate at my index to constrcut values
 	X             []abstract.Point                  //pub keys
 	encShares     map[int]map[int]*pvss.PubVerShare //[src][tgt]
