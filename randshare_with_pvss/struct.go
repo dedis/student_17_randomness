@@ -57,6 +57,17 @@ type StructR1 struct {
 	R1
 }
 
+type Transcript struct {
+	Nodes     int
+	Faulty    int
+	Purpose   string
+	Time      time.Time
+	X         []abstract.Point
+	EncShares map[int]map[int]*pvss.PubVerShare
+	DecShares map[int]map[int]*pvss.PubVerShare
+	secrets   map[int]abstract.Point
+}
+
 type RandShare struct {
 	mutex sync.Mutex
 	*onet.TreeNodeInstance
@@ -73,5 +84,6 @@ type RandShare struct {
 	decShares     map[int]map[int]*pvss.PubVerShare //[src][tgt]
 	secrets       map[int]abstract.Point            //store the recovered secrets to compute the collective random string
 	coStringReady bool
+	coString      abstract.Point
 	Done          chan bool
 }

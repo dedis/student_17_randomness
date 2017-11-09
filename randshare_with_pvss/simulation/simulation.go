@@ -1,8 +1,10 @@
 package main
 
 import (
+	"time"
+
 	"github.com/BurntSushi/toml"
-	"github.com/dedis/student_17_randomness"
+	"github.com/dedis/student_17_randomness/randshare_with_pvss"
 	"gopkg.in/dedis/onet.v1"
 	"gopkg.in/dedis/onet.v1/log"
 	"gopkg.in/dedis/onet.v1/simul"
@@ -10,7 +12,7 @@ import (
 )
 
 func init() {
-	onet.SimulationRegister("RandShare", NewRSSimulation)
+	onet.SimulationRegister("RandSharePVSS", NewRSSimulation)
 }
 
 // RHSimulation implements a RansShare simulation
@@ -47,7 +49,7 @@ func (rss *RSSimulation) Run(config *onet.SimulationConfig) error {
 	if err != nil {
 		return err
 	}
-	rs, _ := client.(*randshare.RandShare)
+	rs, _ := client.(*randsharepvss.RandShare)
 	err = rs.Setup(rss.Hosts, rss.Faulty, rss.Purpose)
 	if err != nil {
 		return err
@@ -59,8 +61,7 @@ func (rss *RSSimulation) Run(config *onet.SimulationConfig) error {
 	select {
 	case <-rs.Done:
 		log.Lvlf1("RandShare - done")
-		random, transcript, err := rs.Suite().Cipher()
-     .Cipher(nil).Random()
+		random, transcript, err := rs.Random()
 		if err != nil {
 			return err
 		}
@@ -69,14 +70,14 @@ func (rss *RSSimulation) Run(config *onet.SimulationConfig) error {
 		log.Lvlf1("RandShare - collective randomness: ok")
 
 		verifyM := monitor.NewTimeMeasure("tver-randshare")
-		err = rs.Verify(rs.Suite(), random, transcript)
+		err = rs.Verify(random, transcript)
 		if err != nil {
 			return err
 		}
 		verifyM.Record()
 		log.Lvlf1("RandShare - verification: ok")
 
-		case <-time.After(time.Second * time.Duration(rhs.Hosts) * 5):
+	case <-time.After(time.Second * time.Duration(10) * 5):
 		log.Print("RansShare - time out")
 	}
 

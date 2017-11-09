@@ -12,7 +12,7 @@ func TestRandShare(t *testing.T) {
 
 	var name = "RandShare"
 	var nodes int = 5
-	var faulty = 1
+	var faulty = nodes / 3
 	var purpose string = "RandShare test run"
 
 	local := onet.NewLocalTest()
@@ -36,6 +36,14 @@ func TestRandShare(t *testing.T) {
 	select {
 	case <-rs.Done:
 		log.Lvlf1("RandShare done")
+		random, transcript, err := rs.Random()
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err = rs.Verify(random, transcript); err != nil {
+			t.Fatal(err)
+		}
+		log.Lvlf1("RandShare verified")
 	case <-time.After(time.Second * time.Duration(nodes) * 2):
 		t.Fatal("RandShare timeout")
 	}
