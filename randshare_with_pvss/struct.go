@@ -1,4 +1,4 @@
-package randshare
+package randsharepvss
 
 /*
 Struct holds the messages that will be sent around in the protocol. You have

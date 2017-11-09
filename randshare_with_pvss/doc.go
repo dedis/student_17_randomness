@@ -10,4 +10,4 @@ A simple protocol uses four files:
 - randshare_test.go tests the protocol in a local test
 
 */
-package randshare
+package randsharepvss

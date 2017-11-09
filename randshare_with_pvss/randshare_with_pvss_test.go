@@ -1,4 +1,4 @@
-package randshare
+package randsharepvss
 
 import (
 	"testing"
