@@ -262,7 +262,7 @@ func (rs *RandShare) Verify(random []byte, transcript *Transcript) error {
 	//verification of encrypted Shares
 	for rowId, encShareMap := range transcript.EncShares {
 		for colId, encShare := range encShareMap {
-			if err := pvss.VerifyEncShare(transcript.Suite, nil, transcript.X[rowId], transcript.PubPolys[colId].Eval(colId).V, encShare); err != nil {
+			if err := pvss.VerifyEncShare(transcript.Suite, nil, transcript.X[colId], transcript.PubPolys[rowId].Eval(colId).V, encShare); err != nil {
 				return err
 			}
 		}
@@ -270,27 +270,27 @@ func (rs *RandShare) Verify(random []byte, transcript *Transcript) error {
 
 	//verification of decrypted shares
 	for rowId, decShareMap := range transcript.DecShares {
-		for colId, share := range decShareMap {
-			if err := pvss.VerifyDecShare(transcript.Suite, nil, transcript.X[rowId], transcript.EncShares[rowId][colId], share); err != nil {
+		for colId, decShare := range decShareMap {
+			if err := pvss.VerifyDecShare(transcript.Suite, nil, transcript.X[colId], transcript.EncShares[rowId][colId], decShare); err != nil {
 				return err
 			}
 		}
 	}
 
 	//verification of secrets
-	for s := range transcript.secrets {
+	for secretId, secretTransc := range transcript.secrets {
 		var encShareList []*pvss.PubVerShare
 		var decShareList []*pvss.PubVerShare
 		for i := 0; i < rs.nodes; i++ {
-			encShareList = append(encShareList, transcript.EncShares[s][i])
-			decShareList = append(decShareList, transcript.DecShares[s][i])
+			encShareList = append(encShareList, transcript.EncShares[secretId][i])
+			decShareList = append(decShareList, transcript.DecShares[secretId][i])
 		}
 
 		secret, err := pvss.RecoverSecret(transcript.Suite, nil, transcript.X, encShareList, decShareList, transcript.Faulty+1, transcript.Nodes)
 		if err != nil {
 			return err
 		}
-		if secret != transcript.secrets[s] {
+		if !secret.Equal(secretTransc) {
 			return errors.New("Secret recovered is not correct")
 		}
 	}
@@ -305,7 +305,7 @@ func (rs *RandShare) Verify(random []byte, transcript *Transcript) error {
 		return err
 	}
 
-	if bytes.Equal(bs, random) {
+	if !bytes.Equal(bs, random) {
 		return errors.New("CoString isn't correct")
 	}
 
