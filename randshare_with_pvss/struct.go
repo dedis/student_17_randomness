@@ -1,12 +1,5 @@
 package randsharepvss
 
-/*
-Struct holds the messages that will be sent around in the protocol. You have
-to define each message twice: once the actual message, and a second time
-with the `*onet.TreeNode` embedded. The latter is used in the handler-function
-so that it can find out who sent the message.
-*/
-
 import (
 	"sync"
 
@@ -21,6 +14,7 @@ import (
 // Name can be used from other packages to refer to this protocol.
 const Name = "RandShare"
 
+//init registers the handlers
 func init() {
 	for _, p := range []interface{}{A1{}, R1{},
 		StructA1{}, StructR1{}} {
@@ -28,63 +22,74 @@ func init() {
 	}
 }
 
-// Announce is used to pass a message to all children.
+//Share is used to send the share along with its coordinates in the matrix encShare : (Src, PubVerShare.S.I)
+type Share struct {
+	Src         int              //The source
+	PubVerShare pvss.PubVerShare //The share
+}
+
+// A1 is the announce.
 type A1 struct {
-	Src     int
-	B       abstract.Point
-	Commits []abstract.Point  //B and Commits to reconstruct pubPoly
-	Share   *pvss.PubVerShare //encShare s_Src,Tgt
+	SessionID []byte            //SessionID to verify the validity of the reply
+	Src       int               //The sender
+	B         abstract.Point    //Info about pubPoly of Src
+	Commits   []abstract.Point  //Commits used with B to reconstruct pubPoly
+	Share     *pvss.PubVerShare //The encrypted share ES_Src,Tgt
 }
 
 // StructAnnounce just contains Announce and the data necessary to identify and
 // process the message in the sda framework.
 type StructA1 struct {
-	*onet.TreeNode
-	A1
+	*onet.TreeNode //The tree
+	A1             //The announce
 }
 
-// Reply returns the count of all children.
+// R1 is the reply.
 type R1 struct {
-	Src    int
-	Shares []*pvss.PubVerShare //decShares of node Src
+	SessionID []byte              //SessionID to verify the validity of the reply
+	Src       int                 //The sender
+	Shares    []*pvss.PubVerShare //The decrypted shares of node Src
 }
 
-// StructReply just contains Reply and the data necessary to identify and
+// StructR1 just contains R1 and the data necessary to identify and
 // process the message in the sda framework.
 type StructR1 struct {
-	*onet.TreeNode
-	R1
+	*onet.TreeNode //The tree
+	R1             //The reply
 }
 
+//Transcript is given to a third party so that it can verify the porcess of creatino of our random srting
 type Transcript struct {
-	Suite     abstract.Suite
-	Nodes     int
-	Faulty    int
-	Purpose   string
-	Time      int64
-	X         []abstract.Point
-	EncShares map[int]map[int]*pvss.PubVerShare
-	PubPolys  []*share.PubPoly
-	DecShares map[int]map[int]*pvss.PubVerShare
-	secrets   map[int]abstract.Point
+	Suite     abstract.Suite                    //The suite (rs.Suite())
+	Nodes     int                               //Number of nodes
+	Faulty    int                               //Number of faulty nodes
+	Purpose   string                            //The purpose
+	Time      int64                             //the time elapsed
+	X         []abstract.Point                  //The public keys
+	EncShares map[int]map[int]*pvss.PubVerShare //The matrix of encrypted shares
+	PubPolys  []*share.PubPoly                  //The pubPoly of every node
+	DecShares map[int]map[int]*pvss.PubVerShare //The matrix of decrypted shares
+	secrets   map[int]abstract.Point            //The recovered secrets
 }
 
+//RandShare is our protocol struct
 type RandShare struct {
-	mutex sync.Mutex
-	*onet.TreeNodeInstance
-
-	faulty        int
-	nodes         int
-	threshold     int
-	purpose       string
-	time          int64
-	pubPolys      []*share.PubPoly                  // i store all of the pubPolys and evaluate at my index to constrcut values
-	X             []abstract.Point                  //pub keys
-	encShares     map[int]map[int]*pvss.PubVerShare //[src][tgt]
-	tracker       map[int]byte
-	decShares     map[int]map[int]*pvss.PubVerShare //[src][tgt]
-	secrets       map[int]abstract.Point            //store the recovered secrets to compute the collective random string
-	coStringReady bool
-	coString      abstract.Point
-	Done          chan bool
+	mutex                  sync.Mutex                        //Mutex to avoid concurrency
+	*onet.TreeNodeInstance                                   //The tree of nodes
+	nodes                  int                               //Number of nodes
+	faulty                 int                               //Number of faulty nodes
+	threshold              int                               //The threshold to recover values
+	purpose                string                            //The purpose of the protocol
+	time                   int64                             //The time elapsed
+	sessionID              []byte                            //The SessionID number (see method SessionID)
+	H                      abstract.Point                    //Our second base point created with SessionID
+	pubPolys               []*share.PubPoly                  //The pubPoly of every node
+	X                      []abstract.Point                  //The public keys
+	encShares              map[int]map[int]*pvss.PubVerShare //Matrix of encrypted shares : ES_src_tgt = encShare[src][tgt]
+	tracker                map[int]byte                      //Keeps tracks of which row has enough encrypted shares
+	decShares              map[int]map[int]*pvss.PubVerShare //Matrix of decrypted shares : DS_src_tgt = decShare[src][tgt]
+	secrets                map[int]abstract.Point            //Recovered secrets
+	coStringReady          bool                              //Is the coString available ?
+	coString               abstract.Point                    //Collective random string computed with the secrets
+	Done                   chan bool                         //Is the protocol done ?
 }

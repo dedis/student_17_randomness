@@ -16,7 +16,7 @@ func init() {
 	onet.GlobalProtocolRegister("RandShare", NewRandShare)
 }
 
-// NewProtocol initialises the structure for use in one round
+// NewRandShare initialises the tree and network
 func NewRandShare(n *onet.TreeNodeInstance) (onet.ProtocolInstance, error) {
 	t := &RandShare{
 		TreeNodeInstance: n,
@@ -25,12 +25,14 @@ func NewRandShare(n *onet.TreeNodeInstance) (onet.ProtocolInstance, error) {
 	return t, err
 }
 
+//Setup initializes RandShare struct
 func (rs *RandShare) Setup(nodes int, faulty int, purpose string) error {
 
 	rs.nodes = nodes
 	rs.faulty = faulty
 	rs.threshold = faulty + 1
 	rs.purpose = purpose
+	rs.sessionID = rs.SessionID()
 	rs.X = make([]abstract.Point, rs.nodes)
 	for j := 0; j < rs.nodes; j++ {
 		rs.X[j] = rs.List()[j].ServerIdentity.Public
@@ -46,9 +48,10 @@ func (rs *RandShare) Setup(nodes int, faulty int, purpose string) error {
 	return nil
 }
 
+//Start starts the protocol from node 0
 func (rs *RandShare) Start() error {
 
-	rs.time = time.Now().Unix() // time.Now.Unix()
+	rs.time = time.Now().Unix()
 
 	encShares, pubPoly, err := pvss.EncShares(rs.Suite(), nil, rs.X, nil, rs.threshold)
 	if err != nil {
@@ -80,9 +83,13 @@ func (rs *RandShare) Start() error {
 	return nil
 }
 
+//HandleA1 handles the announce received is the sessionID is correct
 func (rs *RandShare) HandleA1(announce StructA1) error {
 
 	msg := &announce.A1
+	if !bytes.Equal(msg.SessionID, rs.sessionID) {
+		return nil //If the sessionID is not correct we don't deal with the announce
+	}
 
 	// if it's our first message, we set up rs and send our shares before anwsering
 	if rs.nodes == 0 {
@@ -135,15 +142,16 @@ func (rs *RandShare) HandleA1(announce StructA1) error {
 	if err := pvss.VerifyEncShare(rs.Suite(), nil, rs.X[shareIndex], value, msg.Share); err == nil {
 		//share is correct, we store it in the encShares map
 
+		rs.mutex.Lock()
 		if _, ok := rs.encShares[msg.Src]; !ok {
 			rs.encShares[msg.Src] = make(map[int]*pvss.PubVerShare)
 		}
-		rs.mutex.Lock()
+
 		rs.encShares[msg.Src][shareIndex] = msg.Share
 		rs.mutex.Unlock()
 	}
 
-	if len(rs.encShares[msg.Src]) == rs.nodes { //the ligne encShares[msg.src] is full
+	if len(rs.encShares[msg.Src]) == rs.nodes { //threshold  //the ligne encShares[msg.src] is full
 
 		rs.mutex.Lock()
 		rs.tracker[msg.Src] = 1
@@ -159,6 +167,8 @@ func (rs *RandShare) HandleA1(announce StructA1) error {
 			encShareList = append(encShareList, rs.encShares[j][rs.Index()])
 			values = append(values, rs.pubPolys[j].Eval(rs.Index()).V)
 			keys = append(keys, rs.X[rs.Index()])
+
+			//decShre + storing
 		}
 
 		_, _, validDecShares, err := pvss.DecShareBatch(rs.Suite(), nil, keys, values, rs.Private(), encShareList)
@@ -170,10 +180,10 @@ func (rs *RandShare) HandleA1(announce StructA1) error {
 		for j := 0; j < len(validDecShares); j++ {
 
 			//how to go from j to share-src ? : eval pub[j] at rs.Index and see if == ?
+			rs.mutex.Lock()
 			if _, ok := rs.decShares[j]; !ok {
 				rs.decShares[j] = make(map[int]*pvss.PubVerShare)
 			}
-			rs.mutex.Lock()
 			rs.decShares[j][rs.Index()] = validDecShares[j]
 			rs.mutex.Unlock()
 		}
@@ -188,18 +198,24 @@ func (rs *RandShare) HandleA1(announce StructA1) error {
 }
 
 func (rs *RandShare) HandleR1(reply StructR1) error {
+
 	msg := &reply.R1
 
+	if !bytes.Equal(msg.SessionID, rs.sessionID) {
+		return nil //If the sessionID is not correct we don't deal with the reply
+	}
+
 	//we store all the decShares (we don't have to verify as it will be in the RecoverSecret function)
+	//verifing before storing
 	for j := 0; j < len(msg.Shares); j++ {
+		rs.mutex.Lock()
 		if _, ok := rs.decShares[j]; !ok {
 			rs.decShares[j] = make(map[int]*pvss.PubVerShare)
 		}
-		rs.mutex.Lock()
 		rs.decShares[j][msg.Src] = msg.Shares[j]
 		rs.mutex.Unlock()
 
-		if len(rs.decShares[j]) == rs.nodes { //the line is full : we recover j-th secret
+		if len(rs.decShares[j]) == rs.nodes { //threhold  //the line is full : we recover j-th secret
 
 			var encShareList []*pvss.PubVerShare
 			var decShareList []*pvss.PubVerShare
@@ -309,5 +325,12 @@ func (rs *RandShare) Verify(random []byte, transcript *Transcript) error {
 		return errors.New("CoString isn't correct")
 	}
 
+	return nil
+}
+
+func (rs *RandShare) SessionID() []byte {
+	//We put all the data into a byte buffer
+
+	//we hash it and return it
 	return nil
 }

@@ -15,7 +15,7 @@ func init() {
 	onet.SimulationRegister("RandSharePVSS", NewRSSimulation)
 }
 
-// RHSimulation implements a RansShare simulation
+// RSSimulation implements a RandShare simulation
 type RSSimulation struct {
 	onet.SimulationBFTree
 	Servers int
@@ -23,7 +23,7 @@ type RSSimulation struct {
 	Purpose string
 }
 
-// NewRHSimulation creates a new RansShare simulation
+// NewRSSimulation creates a new RandShare simulation
 func NewRSSimulation(config string) (onet.Simulation, error) {
 	rss := &RSSimulation{}
 	_, err := toml.Decode(config, rss)
@@ -33,7 +33,7 @@ func NewRSSimulation(config string) (onet.Simulation, error) {
 	return rss, nil
 }
 
-// Setup configures a RansShare simulation with certain parameters
+// Setup configures a RandShare simulation with certain parameters
 func (rss *RSSimulation) Setup(dir string, hosts []string) (*onet.SimulationConfig, error) {
 	sim := new(onet.SimulationConfig)
 	rss.CreateRoster(sim, hosts, 2000)
