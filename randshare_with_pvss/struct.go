@@ -11,7 +11,7 @@ import (
 	"gopkg.in/dedis/onet.v1/network"
 )
 
-// Name can be used from other packages to refer to this protocol.
+//Name can be used from other packages to refer to this protocol.
 const Name = "RandShare"
 
 //init registers the handlers
@@ -24,8 +24,8 @@ func init() {
 
 //Share is used to send the share along with its coordinates in the matrix encShare : (Src, PubVerShare.S.I)
 type Share struct {
-	Src         int              //The source
-	PubVerShare pvss.PubVerShare //The share
+	Src         int               //The source
+	PubVerShare *pvss.PubVerShare //The share
 }
 
 // A1 is the announce.
@@ -37,7 +37,7 @@ type A1 struct {
 	Share     *pvss.PubVerShare //The encrypted share ES_Src,Tgt
 }
 
-// StructAnnounce just contains Announce and the data necessary to identify and
+// StructA1 just contains Announce and the data necessary to identify and
 // process the message in the sda framework.
 type StructA1 struct {
 	*onet.TreeNode //The tree
@@ -46,9 +46,9 @@ type StructA1 struct {
 
 // R1 is the reply.
 type R1 struct {
-	SessionID []byte              //SessionID to verify the validity of the reply
-	Src       int                 //The sender
-	Shares    []*pvss.PubVerShare //The decrypted shares of node Src
+	SessionID []byte   //SessionID to verify the validity of the reply
+	Src       int      //The sender
+	Shares    []*Share //The decrypted shares of node Src
 }
 
 // StructR1 just contains R1 and the data necessary to identify and
@@ -66,6 +66,7 @@ type Transcript struct {
 	Purpose   string                            //The purpose
 	Time      int64                             //the time elapsed
 	X         []abstract.Point                  //The public keys
+	H         abstract.Point                    //the 2nd base
 	EncShares map[int]map[int]*pvss.PubVerShare //The matrix of encrypted shares
 	PubPolys  []*share.PubPoly                  //The pubPoly of every node
 	DecShares map[int]map[int]*pvss.PubVerShare //The matrix of decrypted shares

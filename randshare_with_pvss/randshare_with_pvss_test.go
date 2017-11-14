@@ -11,9 +11,9 @@ import (
 func TestRandShare(t *testing.T) {
 
 	var name = "RandShare"
-	var nodes int = 5
+	var nodes = 5
 	var faulty = nodes / 3
-	var purpose string = "RandShare test run"
+	var purpose = "RandShare test run"
 
 	local := onet.NewLocalTest()
 	_, _, tree := local.GenTree(nodes, true)
