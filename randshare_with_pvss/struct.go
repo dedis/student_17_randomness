@@ -60,6 +60,7 @@ type StructR1 struct {
 
 //Transcript is given to a third party so that it can verify the porcess of creatino of our random srting
 type Transcript struct {
+	SessionID []byte                            //the sessionID
 	Suite     abstract.Suite                    //The suite (rs.Suite())
 	Nodes     int                               //Number of nodes
 	Faulty    int                               //Number of faulty nodes

@@ -40,7 +40,7 @@ func TestRandShare(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err = rs.Verify(random, transcript); err != nil {
+		if err = Verify(random, transcript); err != nil {
 			t.Fatal(err)
 		}
 		log.Lvlf1("RandShare verified")

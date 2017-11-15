@@ -13,7 +13,6 @@ import (
 	"gopkg.in/dedis/crypto.v0/share/pvss"
 	"gopkg.in/dedis/onet.v1"
 	"gopkg.in/dedis/onet.v1/crypto"
-	"gopkg.in/dedis/onet.v1/log"
 )
 
 func init() {
@@ -40,7 +39,7 @@ func (rs *RandShare) Setup(nodes int, faulty int, purpose string) error {
 	for j := 0; j < rs.nodes; j++ {
 		rs.X[j] = rs.List()[j].ServerIdentity.Public
 	}
-	rs.sessionID = rs.SessionID()
+	rs.sessionID = SessionID(rs.Suite(), rs.nodes, rs.faulty, rs.X)
 	rs.H, _ = rs.Suite().Point().Pick(nil, rs.Suite().Cipher(rs.sessionID))
 	rs.pubPolys = make([]*share.PubPoly, rs.nodes)
 	rs.encShares = make(map[int]map[int]*pvss.PubVerShare)
@@ -68,7 +67,7 @@ func (rs *RandShare) Start() error {
 	for j := 0; j < rs.nodes; j++ {
 
 		announce := &A1{
-			SessionID: rs.SessionID(),
+			SessionID: rs.sessionID,
 			Src:       rs.Index(),
 			Share:     encShares[j],
 			B:         b,
@@ -114,7 +113,7 @@ func (rs *RandShare) HandleA1(announce StructA1) error {
 
 		for j := 0; j < rs.nodes; j++ {
 			announce := &A1{
-				SessionID: rs.SessionID(),
+				SessionID: rs.sessionID,
 				Src:       rs.Index(),
 				Share:     encShares[j],
 				B:         b,
@@ -191,7 +190,7 @@ func (rs *RandShare) HandleA1(announce StructA1) error {
 			}
 		}
 		//we brodcast our decShares
-		reply := &R1{SessionID: rs.SessionID(), Src: rs.Index(), Shares: decShares}
+		reply := &R1{SessionID: rs.sessionID, Src: rs.Index(), Shares: decShares}
 		if err := rs.Broadcast(reply); err != nil {
 			return err
 		}
@@ -208,33 +207,33 @@ func (rs *RandShare) HandleR1(reply StructR1) error {
 		return nil //If the sessionID is not correct we don't deal with the reply
 	}
 
-	//we store all the decShares (we don't have to verify as it will be in the RecoverSecret function)
-	//verifing before storing
+	//we store all the correct decShares
 	for _, share := range msg.Shares {
 
-		rs.mutex.Lock()
-		if _, ok := rs.decShares[share.Src]; !ok {
-			rs.decShares[share.Src] = make(map[int]*pvss.PubVerShare)
+		if err := pvss.VerifyDecShare(rs.Suite(), nil, rs.X[share.PubVerShare.S.I], rs.encShares[share.Src][share.PubVerShare.S.I], share.PubVerShare); err == nil {
+			rs.mutex.Lock()
+			if _, ok := rs.decShares[share.Src]; !ok {
+				rs.decShares[share.Src] = make(map[int]*pvss.PubVerShare)
+			}
+			rs.decShares[share.Src][share.PubVerShare.S.I] = share.PubVerShare
+			rs.mutex.Unlock()
 		}
-		rs.decShares[share.Src][share.PubVerShare.S.I] = share.PubVerShare
-		rs.mutex.Unlock()
-
 		if len(rs.decShares[share.Src]) == rs.threshold { //we can recover src-th secret
 			var encShareList []*pvss.PubVerShare
 			var decShareList []*pvss.PubVerShare
 			var keys []abstract.Point
 			for i := 0; i < rs.nodes; i++ {
-				if _, ok := rs.encShares[share.Src]; ok { //we have values on the line
-					if encShare, ok := rs.encShares[share.Src][i]; ok { //we have a encrypted share on our column
-						//we construct goodKeys and goddEncShares depending on
+				if encShare, ok := rs.encShares[share.Src][i]; ok { //we have a encrypted share => we have a decShare
+					//we construct goodKeys and goddEncShares depending on
+					if decShare, ok := rs.decShares[share.Src][i]; ok {
 						encShareList = append(encShareList, encShare)
-						decShareList = append(decShareList, share.PubVerShare)
+						decShareList = append(decShareList, decShare)
 						keys = append(keys, rs.X[i])
 					}
 				}
 			}
-			log.LLvlf1("Index %d, keys %+v, encShareList %+v, decShareList%+v", rs.Index(), keys, encShareList, decShareList)
-			secret, err := pvss.RecoverSecret(rs.Suite(), rs.H, keys, encShareList, decShareList, rs.threshold, rs.nodes)
+
+			secret, err := pvss.RecoverSecret(rs.Suite(), nil, keys, encShareList, decShareList, rs.threshold, rs.nodes)
 			if err != nil {
 				//log.LLvlf1("RS INDEX %d recovering secret %d", rs.Index(), j)
 				return err
@@ -270,6 +269,7 @@ func (rs *RandShare) Random() ([]byte, *Transcript, error) {
 		return nil, nil, err
 	}
 	transcript := &Transcript{
+		SessionID: rs.sessionID,
 		Suite:     rs.Suite(),
 		Nodes:     rs.nodes,
 		Faulty:    rs.faulty,
@@ -286,7 +286,13 @@ func (rs *RandShare) Random() ([]byte, *Transcript, error) {
 }
 
 //Verify is a method that verifies that following the transcript, we indeed created the random collective string
-func (rs *RandShare) Verify(random []byte, transcript *Transcript) error {
+func Verify(random []byte, transcript *Transcript) error {
+	//verification of sessionID
+	sid := SessionID(transcript.Suite, transcript.Nodes, transcript.Faulty, transcript.X)
+
+	if !bytes.Equal(transcript.SessionID, sid) {
+		return errors.New("Wrong session identifier")
+	}
 
 	//verification of encrypted Shares
 	for rowID, encShareMap := range transcript.EncShares {
@@ -300,7 +306,7 @@ func (rs *RandShare) Verify(random []byte, transcript *Transcript) error {
 	//verification of decrypted shares
 	for rowID, decShareMap := range transcript.DecShares {
 		for colID, decShare := range decShareMap {
-			if err := pvss.VerifyDecShare(transcript.Suite, transcript.H, transcript.X[colID], transcript.EncShares[rowID][colID], decShare); err != nil {
+			if err := pvss.VerifyDecShare(transcript.Suite, nil, transcript.X[colID], transcript.EncShares[rowID][colID], decShare); err != nil {
 				return err
 			}
 		}
@@ -310,12 +316,12 @@ func (rs *RandShare) Verify(random []byte, transcript *Transcript) error {
 	for secretID, secretTransc := range transcript.secrets {
 		var encShareList []*pvss.PubVerShare
 		var decShareList []*pvss.PubVerShare
-		for i := 0; i < rs.nodes; i++ {
+		for i := 0; i < transcript.Nodes; i++ {
 			encShareList = append(encShareList, transcript.EncShares[secretID][i])
 			decShareList = append(decShareList, transcript.DecShares[secretID][i])
 		}
 
-		secret, err := pvss.RecoverSecret(transcript.Suite, transcript.H, transcript.X, encShareList, decShareList, transcript.Faulty+1, transcript.Nodes)
+		secret, err := pvss.RecoverSecret(transcript.Suite, nil, transcript.X, encShareList, decShareList, transcript.Faulty+1, transcript.Nodes)
 		if err != nil {
 			return err
 		}
@@ -342,18 +348,18 @@ func (rs *RandShare) Verify(random []byte, transcript *Transcript) error {
 }
 
 //SessionID hashes the data hat caracterizes a particualar randShare protocol into a identifier
-func (rs *RandShare) SessionID() []byte {
+func SessionID(suite abstract.Suite, nodes int, faulty int, X []abstract.Point) []byte {
 
 	//We put all the data into a byte buffer
 	//data is composed of nodes, threhold, public keys
 	buf := new(bytes.Buffer)
-	if err := binary.Write(buf, binary.LittleEndian, uint32(rs.nodes)); err != nil {
+	if err := binary.Write(buf, binary.LittleEndian, uint32(nodes)); err != nil {
 		return nil
 	}
-	if err := binary.Write(buf, binary.LittleEndian, uint32(rs.threshold)); err != nil {
+	if err := binary.Write(buf, binary.LittleEndian, uint32(faulty)); err != nil {
 		return nil
 	}
-	for _, key := range rs.X {
+	for _, key := range X {
 		keyB, err := key.MarshalBinary()
 		if err != nil {
 			return nil
@@ -363,6 +369,6 @@ func (rs *RandShare) SessionID() []byte {
 		}
 	}
 	//we hash our data and return it
-	hash, _ := crypto.HashBytes(rs.Suite().Hash(), buf.Bytes())
+	hash, _ := crypto.HashBytes(suite.Hash(), buf.Bytes())
 	return hash
 }
