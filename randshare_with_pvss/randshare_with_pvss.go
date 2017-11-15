@@ -45,6 +45,10 @@ func (rs *RandShare) Setup(nodes int, faulty int, purpose string) error {
 	rs.encShares = make(map[int]map[int]*pvss.PubVerShare)
 	rs.tracker = make(map[int]byte)
 	rs.decShares = make(map[int]map[int]*pvss.PubVerShare)
+	for i := 0; i < rs.nodes; i++ {
+		rs.encShares[i] = make(map[int]*pvss.PubVerShare)
+		rs.decShares[i] = make(map[int]*pvss.PubVerShare)
+	}
 	rs.secrets = make(map[int]abstract.Point)
 	rs.coStringReady = false
 	rs.Done = make(chan bool, 0)
@@ -74,11 +78,8 @@ func (rs *RandShare) Start() error {
 			Commits:   commits,
 		}
 
-		if _, ok := rs.encShares[rs.Index()]; !ok {
-			rs.encShares[rs.Index()] = make(map[int]*pvss.PubVerShare)
-			rs.tracker[rs.Index()] = 1
-		}
 		rs.encShares[rs.Index()][j] = encShares[j]
+		rs.tracker[rs.Index()] = 1
 
 		if err := rs.Broadcast(announce); err != nil {
 			return err
@@ -121,11 +122,9 @@ func (rs *RandShare) HandleA1(announce StructA1) error {
 			}
 
 			//we know they are correct, we can store them
-			if _, ok := rs.encShares[rs.Index()]; !ok {
-				rs.encShares[rs.Index()] = make(map[int]*pvss.PubVerShare)
-				rs.tracker[rs.Index()] = 1
-			}
+
 			rs.encShares[rs.Index()][j] = encShares[j]
+			rs.tracker[rs.Index()] = 1
 
 			if err := rs.Broadcast(announce); err != nil {
 				return err
@@ -149,10 +148,6 @@ func (rs *RandShare) HandleA1(announce StructA1) error {
 		//share is correct, we store it in the encShares map
 
 		rs.mutex.Lock()
-		if _, ok := rs.encShares[msg.Src]; !ok {
-			rs.encShares[msg.Src] = make(map[int]*pvss.PubVerShare)
-		}
-
 		rs.encShares[msg.Src][shareIndex] = msg.Share
 		rs.mutex.Unlock()
 	}
@@ -181,9 +176,6 @@ func (rs *RandShare) HandleA1(announce StructA1) error {
 
 					//the share is correct we store it
 					rs.mutex.Lock()
-					if _, ok := rs.decShares[j]; !ok {
-						rs.decShares[j] = make(map[int]*pvss.PubVerShare)
-					}
 					rs.decShares[j][rs.Index()] = decShare
 					rs.mutex.Unlock()
 				}
@@ -212,9 +204,6 @@ func (rs *RandShare) HandleR1(reply StructR1) error {
 
 		if err := pvss.VerifyDecShare(rs.Suite(), nil, rs.X[share.PubVerShare.S.I], rs.encShares[share.Src][share.PubVerShare.S.I], share.PubVerShare); err == nil {
 			rs.mutex.Lock()
-			if _, ok := rs.decShares[share.Src]; !ok {
-				rs.decShares[share.Src] = make(map[int]*pvss.PubVerShare)
-			}
 			rs.decShares[share.Src][share.PubVerShare.S.I] = share.PubVerShare
 			rs.mutex.Unlock()
 		}
