@@ -85,9 +85,9 @@ func (rs *RandShare) Start() error {
 		}
 
 		//we know they are correct, we can store threshold shares of them ???
-		if j < rs.threshold {
-			rs.encShares[rs.Index()][j] = encShares[j]
-		}
+
+		rs.encShares[rs.Index()][j] = encShares[j]
+
 		rs.tracker[rs.Index()] = 1
 
 		if err := rs.Broadcast(announce); err != nil {
@@ -332,9 +332,9 @@ func Verify(random []byte, transcript *Transcript) error {
 		var decShareList []*pvss.PubVerShare
 		var keys []abstract.Point
 
-		for j, share := range transcript.EncShares[secretID] {
-			encShareList = append(encShareList, share)
-			decShareList = append(decShareList, transcript.DecShares[secretID][j])
+		for j, share := range transcript.DecShares[secretID] {
+			encShareList = append(encShareList, transcript.EncShares[secretID][j])
+			decShareList = append(decShareList, share)
 			keys = append(keys, transcript.X[j])
 		}
 
