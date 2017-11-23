@@ -25,7 +25,8 @@ func TestRandShare(t *testing.T) {
 		t.Fatal("couldn't initialize", err)
 	}
 	rs := protocol.(*RandShare)
-	err = rs.Setup(nodes, faulty, purpose)
+	startingTime := time.Now().Unix()
+	err = rs.Setup(nodes, faulty, purpose, startingTime)
 	if err != nil {
 		t.Fatal("couldn't initialize", err)
 	}

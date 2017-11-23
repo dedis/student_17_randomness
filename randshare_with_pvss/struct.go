@@ -35,6 +35,8 @@ type A1 struct {
 	B         abstract.Point    //Info about pubPoly of Src
 	Commits   []abstract.Point  //Commits used with B to reconstruct pubPoly
 	Share     *pvss.PubVerShare //The encrypted share ES_Src,Tgt
+	Purpose   string            //the purpose of the current ProtocolInstance
+	Time      int64             //time given by initializer to compute sessionID
 }
 
 // StructA1 just contains Announce and the data necessary to identify and
@@ -65,7 +67,7 @@ type Transcript struct {
 	Nodes     int                               //Number of nodes
 	Faulty    int                               //Number of faulty nodes
 	Purpose   string                            //The purpose
-	Time      int64                             //the time elapsed
+	Time      int64                             //the starting time
 	X         []abstract.Point                  //The public keys
 	H         abstract.Point                    //the 2nd base
 	EncShares map[int]map[int]*pvss.PubVerShare //The matrix of encrypted shares
@@ -82,7 +84,7 @@ type RandShare struct {
 	faulty                 int                               //Number of faulty nodes
 	threshold              int                               //The threshold to recover values
 	purpose                string                            //The purpose of the protocol
-	time                   int64                             //The time elapsed
+	startingTime           int64                             //starting time of the randshare protocol run
 	sessionID              []byte                            //The SessionID number (see method SessionID)
 	H                      abstract.Point                    //Our second base point created with SessionID
 	pubPolys               []*share.PubPoly                  //The pubPoly of every node
