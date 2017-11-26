@@ -1,7 +1,7 @@
 /*Package randsharepvss gathers the files used to create a randshare proctocol with PVSS feature.
 The protocol has two messages:
-	- A1 which is sent from the root down the tree
-	- R1 which is sent back up to the root
+	- the announce A1 which is used to brodcast encrypted shares
+	- the reply R1 which is used to brodcast decrypted shares
 
 
 A simple protocol uses four files:
