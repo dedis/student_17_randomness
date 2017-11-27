@@ -10,8 +10,8 @@ import (
 	"gopkg.in/dedis/crypto.v0/share"
 	"gopkg.in/dedis/crypto.v0/share/pvss"
 	"gopkg.in/dedis/onet.v1"
-	//"gopkg.in/dedis/onet.v1/log"
 	"gopkg.in/dedis/onet.v1/crypto"
+	"gopkg.in/dedis/onet.v1/log"
 )
 
 func init() {
@@ -235,7 +235,7 @@ func (rs *RandShare) HandleR1(reply StructR1) error {
 
 					secret, err := pvss.RecoverSecret(rs.Suite(), nil, keys, encShareList, decShareList, rs.threshold, rs.nodes)
 					if err != nil {
-						//log.LLvlf1("RS INDEX %d recovering secret %d", rs.Index(), j)
+						log.LLvlf1("RS INDEX %d recovering secret %d", rs.Index(), share.Src)
 						return err
 					}
 					//rs.mutex.Lock()

@@ -50,7 +50,8 @@ func (rss *RSSimulation) Run(config *onet.SimulationConfig) error {
 		return err
 	}
 	rs, _ := client.(*randsharepvss.RandShare)
-	err = rs.Setup(rss.Hosts, rss.Faulty, rss.Purpose)
+	strartingTime := time.Now().Unix()
+	err = rs.Setup(rss.Hosts, rss.Faulty, rss.Purpose, strartingTime)
 	if err != nil {
 		return err
 	}
@@ -70,7 +71,7 @@ func (rss *RSSimulation) Run(config *onet.SimulationConfig) error {
 		log.Lvlf1("RandShare - collective randomness: ok")
 
 		verifyM := monitor.NewTimeMeasure("tver-randshare")
-		err = rs.Verify(random, transcript)
+		err = randsharepvss.Verify(random, transcript)
 		if err != nil {
 			return err
 		}
