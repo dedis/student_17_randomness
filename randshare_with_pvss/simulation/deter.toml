@@ -1,0 +1,13 @@
+Login = "mathilde"
+Host = "users.deterlab.net"
+Project = "SAFER"
+Experiment = "RandShare"
+ProxyAddress = "localhost"
+MonitorAddress = "users.isi.deterlab.net"
+MonitorPort = 10000
+Servers = 4
+Simulation = "RandSharePVSS"
+Hosts = 0
+Debug = 0
+RunWait = 0
+PreScript = ""
