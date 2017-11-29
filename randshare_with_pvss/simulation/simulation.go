@@ -51,10 +51,11 @@ func (rss *RSSimulation) Run(config *onet.SimulationConfig) error {
 	}
 	rs, _ := client.(*randsharepvss.RandShare)
 	strartingTime := time.Now().Unix()
-	err = rs.Setup(rss.Hosts, rss.Faulty, rss.Purpose, strartingTime)
+	err = rs.Setup(rss.Hosts, rss.Hosts/3, rss.Purpose, strartingTime)
 	if err != nil {
 		return err
 	}
+
 	if err := rs.Start(); err != nil {
 		log.Error("Error while starting protcol:", err)
 	}
@@ -78,7 +79,7 @@ func (rss *RSSimulation) Run(config *onet.SimulationConfig) error {
 		verifyM.Record()
 		log.Lvlf1("RandShare - verification: ok")
 
-	case <-time.After(time.Second * time.Duration(10) * 5):
+	case <-time.After(time.Second * time.Duration(rss.Hosts) * 10):
 		log.Print("RansShare - time out")
 	}
 
