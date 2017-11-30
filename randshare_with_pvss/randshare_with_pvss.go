@@ -3,6 +3,7 @@ package randsharepvss
 import (
 	"bytes"
 	"errors"
+	//"time"
 
 	"encoding/binary"
 
@@ -46,9 +47,6 @@ func (rs *RandShare) Setup(nodes int, faulty int, purpose string, time int64) er
 	rs.pubPolys = make([]*share.PubPoly, rs.nodes)
 	rs.encShares = make(map[int]map[int]*pvss.PubVerShare)
 	rs.tracker = make(map[int]byte)
-	for i := 0; i < rs.nodes; i++ {
-		rs.tracker[i] = 0
-	}
 
 	rs.decShares = make(map[int]map[int]*pvss.PubVerShare)
 
@@ -87,8 +85,10 @@ func (rs *RandShare) Start() error {
 		}
 
 		//we know they are correct, we can store them and put the tracker to 1
+		rs.mutex.Lock()
 		rs.encShares[rs.Index()][j] = encShares[j]
 		rs.tracker[rs.Index()] = 1
+		rs.mutex.Unlock()
 
 		if err := rs.Broadcast(announce); err != nil {
 			return err
@@ -101,9 +101,6 @@ func (rs *RandShare) Start() error {
 func (rs *RandShare) HandleA1(announce StructA1) error {
 
 	msg := &announce.A1
-
-	//rs.mutex.Lock()
-	//defer rs.mutex.Unlock()
 
 	//if it's our first message, we set up rs and send our shares before anwsering
 	if rs.nodes == 0 {
@@ -131,6 +128,8 @@ func (rs *RandShare) HandleA1(announce StructA1) error {
 				Share:     encShares[j],
 				B:         b,
 				Commits:   commits,
+				Purpose:   rs.purpose,
+				Time:      rs.startingTime,
 			}
 
 			//we know they are correct, we can store them
@@ -147,7 +146,7 @@ func (rs *RandShare) HandleA1(announce StructA1) error {
 	if !bytes.Equal(msg.SessionID, rs.sessionID) {
 		return nil //If the sessionID is not correct we don't deal with the announce
 	}
-	if rs.tracker[msg.Src] != 1 { //if tracker is at 0 we need to store more shares
+	if _, ok := rs.tracker[msg.Src]; !ok { //we need to store more shares
 		shareIndex := msg.Share.S.I
 		pubPolySrc := share.NewPubPoly(rs.Suite(), msg.B, msg.Commits)
 
@@ -190,6 +189,7 @@ func (rs *RandShare) HandleA1(announce StructA1) error {
 
 			//we brodcast our decShares
 			reply := &R1{SessionID: rs.sessionID, Src: rs.Index(), Shares: decShares}
+			//time.Sleep(100 * time.Millisecond)
 			if err := rs.Broadcast(reply); err != nil {
 				return err
 			}
@@ -202,10 +202,9 @@ func (rs *RandShare) HandleA1(announce StructA1) error {
 func (rs *RandShare) HandleR1(reply StructR1) error {
 
 	msg := &reply.R1
-	//rs.mutex.Lock()
-	//defer rs.mutex.Unlock()
 
 	if !bytes.Equal(msg.SessionID, rs.sessionID) {
+		//log.LLvlf1("STUCK %d, nodes %d, faulty %d, purpose %s, time %d", rs.Index(), rs.nodes, rs.faulty, rs.purpose, rs.startingTime)
 		return nil //If the sessionID is not correct we don't deal with the reply
 	}
 	//log.LLvlf1("HERE for node %d with encshares %+v \n and dechshares \n %+v", rs.Index(), rs.encShares, rs.decShares)

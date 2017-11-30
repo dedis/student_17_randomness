@@ -11,7 +11,7 @@ import (
 func TestRandShare(t *testing.T) {
 
 	var name = "RandShare"
-	var nodes = 5
+	var nodes = 13
 	var faulty = nodes / 3
 	var purpose = "RandShare test run"
 
