@@ -91,7 +91,8 @@ type RandShare struct {
 	X                      []abstract.Point                  //The public keys
 	encShares              map[int]map[int]*pvss.PubVerShare //Matrix of encrypted shares : ES_src_tgt = encShare[src][tgt]
 	tracker                map[int]byte                      //Keeps tracks of which row has enough encrypted shares
-	decShares              map[int]map[int]*pvss.PubVerShare //Matrix of decrypted shares : DS_src_tgt = decShare[src][tgt]
+	decShares              map[int]map[int]*pvss.PubVerShare //Matrix of all decrypted shares received : DS_src_tgt = decShare[src][tgt]
+	decSharesVerified      map[int]map[int]*pvss.PubVerShare //Matrix of decrypted shares verified thanks to the corresponding encrypted share
 	secrets                map[int]abstract.Point            //Recovered secrets
 	coStringReady          bool                              //Is the coString available ?
 	coString               abstract.Point                    //Collective random string computed with the secrets
