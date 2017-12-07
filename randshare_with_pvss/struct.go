@@ -16,8 +16,8 @@ const Name = "RandShare"
 
 //init registers the handlers
 func init() {
-	for _, p := range []interface{}{A1{}, R1{},
-		StructA1{}, StructR1{}} {
+	for _, p := range []interface{}{A1{}, S1{}, R1{},
+		StructA1{}, StructS1{}, StructR1{}} {
 		network.RegisterMessage(p)
 	}
 }
@@ -44,6 +44,19 @@ type A1 struct {
 type StructA1 struct {
 	*onet.TreeNode //The tree
 	A1             //The announce
+}
+
+//S1 is sent when a node reaches the 1st step.
+type S1 struct {
+	SessionID []byte //SessionID to verify the validity
+	Src       int    //The sender
+}
+
+// StructR1 just contains S1 and the data necessary to identify and
+// process the message in the sda framework.
+type StructS1 struct {
+	*onet.TreeNode //The tree
+	S1             //The reply
 }
 
 // R1 is the reply.
@@ -91,8 +104,8 @@ type RandShare struct {
 	X                      []abstract.Point                  //The public keys
 	encShares              map[int]map[int]*pvss.PubVerShare //Matrix of encrypted shares : ES_src_tgt = encShare[src][tgt]
 	tracker                map[int]byte                      //Keeps tracks of which row has enough encrypted shares
-	decShares              map[int]map[int]*pvss.PubVerShare //Matrix of all decrypted shares received : DS_src_tgt = decShare[src][tgt]
-	decSharesVerified      map[int]map[int]*pvss.PubVerShare //Matrix of decrypted shares verified thanks to the corresponding encrypted share
+	S                      map[int]byte                      //Keeps tracks of who reaches the 1st step
+	decShares              map[int]map[int]*pvss.PubVerShare //Matrix of decrypted shares : DS_src_tgt = decShare[src][tgt]
 	secrets                map[int]abstract.Point            //Recovered secrets
 	coStringReady          bool                              //Is the coString available ?
 	coString               abstract.Point                    //Collective random string computed with the secrets
