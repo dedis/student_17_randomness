@@ -28,15 +28,20 @@ type Share struct {
 	PubVerShare *pvss.PubVerShare //The share
 }
 
+type Vote struct {
+	Voted bool //a boolean to verify that a certain node doesn't vote twice
+	Vote  int  //The vote associated to that node
+}
+
 // A1 is the announce.
 type A1 struct {
-	SessionID []byte            //SessionID to verify the validity of the reply
-	Src       int               //The sender
-	B         abstract.Point    //Info about pubPoly of Src
-	Commits   []abstract.Point  //Commits used with B to reconstruct pubPoly
-	Share     *pvss.PubVerShare //The encrypted share ES_Src,Tgt
-	Purpose   string            //the purpose of the current ProtocolInstance
-	Time      int64             //time given by initializer to compute sessionID
+	SessionID []byte              //SessionID to verify the validity of the reply
+	Src       int                 //The sender
+	B         abstract.Point      //Info about pubPoly of Src
+	Commits   []abstract.Point    //Commits used with B to reconstruct pubPoly
+	Shares    []*pvss.PubVerShare //The src th row of encrypted shares
+	Purpose   string              //the purpose of the current ProtocolInstance
+	Time      int64               //time given by initializer to compute sessionID
 }
 
 // StructA1 just contains Announce and the data necessary to identify and
@@ -48,8 +53,9 @@ type StructA1 struct {
 
 //S1 is sent when a node reaches the 1st step.
 type S1 struct {
-	SessionID []byte //SessionID to verify the validity
-	Src       int    //The sender
+	SessionID []byte        //SessionID to verify the validity
+	Src       int           //The sender
+	Votes     map[int]*Vote //The votes
 }
 
 // StructR1 just contains S1 and the data necessary to identify and
@@ -86,7 +92,8 @@ type Transcript struct {
 	EncShares map[int]map[int]*pvss.PubVerShare //The matrix of encrypted shares
 	PubPolys  []*share.PubPoly                  //The pubPoly of every node
 	DecShares map[int]map[int]*pvss.PubVerShare //The matrix of decrypted shares
-	secrets   map[int]abstract.Point            //The recovered secrets
+	Votes     map[int]*Vote                     //The votes
+	Secrets   map[int]abstract.Point            //The recovered secrets
 }
 
 //RandShare is our protocol struct
@@ -103,8 +110,8 @@ type RandShare struct {
 	pubPolys               []*share.PubPoly                  //The pubPoly of every node
 	X                      []abstract.Point                  //The public keys
 	encShares              map[int]map[int]*pvss.PubVerShare //Matrix of encrypted shares : ES_src_tgt = encShare[src][tgt]
-	tracker                map[int]byte                      //Keeps tracks of which row has enough encrypted shares
-	S                      map[int]byte                      //Keeps tracks of who reaches the 1st step
+	tracker                map[int]int                       //tracker[i] can be -1 not enough enc share verified, 0 nothing received, 1 we have enough enc shares
+	votes                  map[int]*Vote                     //Indexes of good nodes is set at 1, sent when receieved an announce from everyone
 	decShares              map[int]map[int]*pvss.PubVerShare //Matrix of decrypted shares : DS_src_tgt = decShare[src][tgt]
 	secrets                map[int]abstract.Point            //Recovered secrets
 	coStringReady          bool                              //Is the coString available ?

@@ -12,7 +12,7 @@ import (
 	"gopkg.in/dedis/crypto.v0/share/pvss"
 	"gopkg.in/dedis/onet.v1"
 	"gopkg.in/dedis/onet.v1/crypto"
-	//"gopkg.in/dedis/onet.v1/log"
+	"gopkg.in/dedis/onet.v1/log"
 )
 
 func init() {
@@ -46,14 +46,15 @@ func (rs *RandShare) Setup(nodes int, faulty int, purpose string, time int64) er
 
 	rs.pubPolys = make([]*share.PubPoly, rs.nodes)
 	rs.encShares = make(map[int]map[int]*pvss.PubVerShare)
-	rs.tracker = make(map[int]byte)
-	rs.S = make(map[int]byte)
+	rs.tracker = make(map[int]int)
+	rs.votes = make(map[int]*Vote)
 
 	rs.decShares = make(map[int]map[int]*pvss.PubVerShare)
 
 	for i := 0; i < rs.nodes; i++ {
 		rs.encShares[i] = make(map[int]*pvss.PubVerShare)
 		rs.decShares[i] = make(map[int]*pvss.PubVerShare)
+		rs.votes[i] = &Vote{Voted: false, Vote: 0}
 	}
 
 	rs.secrets = make(map[int]abstract.Point)
@@ -75,27 +76,27 @@ func (rs *RandShare) Start() error {
 	rs.mutex.Unlock()
 	b, commits := pubPoly.Info()
 
+	announce := &A1{
+		SessionID: rs.sessionID,
+		Src:       rs.Index(),
+		Shares:    encShares,
+		B:         b,
+		Commits:   commits,
+		Purpose:   rs.purpose,
+		Time:      rs.startingTime,
+	}
+
 	for j := 0; j < rs.nodes; j++ {
-
-		announce := &A1{
-			SessionID: rs.sessionID,
-			Src:       rs.Index(),
-			Share:     encShares[j],
-			B:         b,
-			Commits:   commits,
-			Purpose:   rs.purpose,
-			Time:      rs.startingTime,
-		}
-
 		//we know they are correct, we can store them and put the tracker to 1
 		rs.mutex.Lock()
 		rs.encShares[rs.Index()][j] = encShares[j]
 		rs.tracker[rs.Index()] = 1
+		rs.votes[rs.Index()] = &Vote{Voted: true, Vote: 1}
 		rs.mutex.Unlock()
+	}
 
-		if err := rs.Broadcast(announce); err != nil {
-			return err
-		}
+	if err := rs.Broadcast(announce); err != nil {
+		return err
 	}
 	return nil
 }
@@ -124,63 +125,80 @@ func (rs *RandShare) HandleA1(announce StructA1) error {
 
 		b, commits := pubPoly.Info()
 
-		for j := 0; j < rs.nodes; j++ {
-			announce := &A1{
-				SessionID: rs.sessionID,
-				Src:       rs.Index(),
-				Share:     encShares[j],
-				B:         b,
-				Commits:   commits,
-				Purpose:   rs.purpose,
-				Time:      rs.startingTime,
-			}
+		announce := &A1{
+			SessionID: rs.sessionID,
+			Src:       rs.Index(),
+			Shares:    encShares,
+			B:         b,
+			Commits:   commits,
+			Purpose:   rs.purpose,
+			Time:      rs.startingTime,
+		}
 
+		for j := 0; j < rs.nodes; j++ {
 			//we know they are correct, we can store them
 			rs.encShares[rs.Index()][j] = encShares[j]
 			rs.tracker[rs.Index()] = 1
-
-			if err := rs.Broadcast(announce); err != nil {
-				return err
-			}
+			rs.votes[rs.Index()] = &Vote{Voted: true, Vote: 1}
 		}
+
 		rs.mutex.Unlock()
+
+		if err := rs.Broadcast(announce); err != nil {
+			return err
+		}
 	}
 
 	if !bytes.Equal(msg.SessionID, rs.sessionID) {
 		return nil //If the sessionID is not correct we don't deal with the announce
 	}
-	if _, ok := rs.tracker[msg.Src]; !ok { //we need to store more shares
-		shareIndex := msg.Share.S.I
+
+	if _, ok := rs.tracker[msg.Src]; !ok { //we got nothing from that sender
+		rs.mutex.Lock()
 		pubPolySrc := share.NewPubPoly(rs.Suite(), msg.B, msg.Commits)
 
-		rs.mutex.Lock()
 		rs.pubPolys[msg.Src] = pubPolySrc
-		rs.mutex.Unlock()
+		//rs.mutex.Unlock()
 
-		value := pubPolySrc.Eval(shareIndex).V
-		if err := pvss.VerifyEncShare(rs.Suite(), rs.H, rs.X[shareIndex], value, msg.Share); err == nil {
-			//share is correct, we store it in the encShares map
-			rs.mutex.Lock()
-			rs.encShares[msg.Src][shareIndex] = msg.Share
-			rs.mutex.Unlock()
-		}
+		for _, share := range msg.Shares {
+			shareIndex := share.S.I
+			value := pubPolySrc.Eval(shareIndex).V
 
-		if len(rs.encShares[msg.Src]) == rs.threshold { //enough shares to recover
-			rs.mutex.Lock()
-			rs.tracker[msg.Src] = 1
-			rs.mutex.Unlock()
-		}
+			if err := pvss.VerifyEncShare(rs.Suite(), rs.H, rs.X[shareIndex], value, share); err == nil {
+				//share is correct, we store it in the encShares map
+				//	rs.mutex.Lock()
+				rs.encShares[msg.Src][shareIndex] = share
+				//	rs.mutex.Unlock()
+			}
 
-		if len(rs.tracker) == rs.nodes { //we can recover everything
-			rs.mutex.Lock()
-			rs.S[rs.Index()] = 1
-			rs.mutex.Unlock()
-			//we say that we are done storing
-			step := &S1{SessionID: rs.sessionID, Src: rs.Index()}
-			if err := rs.Broadcast(step); err != nil {
-				return err
+			if len(rs.encShares[msg.Src]) == rs.nodes {
+				//	rs.mutex.Lock()
+				rs.tracker[msg.Src] = 1
+				//	rs.mutex.Unlock()
+			} else {
+				//	rs.mutex.Lock()
+				rs.tracker[msg.Src] = -1
+				//	rs.mutex.Unlock()
+			}
+
+			if len(rs.tracker) == rs.nodes { //we had announce from everyone
+				for index, vote := range rs.tracker {
+					if vote == 1 {
+						//rs.mutex.Lock()
+						rs.votes[index].Vote += 1
+						//rs.mutex.Unlock()
+					}
+				}
+				//we say that we are done storing, we send our votes
+				step := &S1{SessionID: rs.sessionID, Src: rs.Index(), Votes: rs.votes}
+				if err := rs.Broadcast(step); err != nil {
+					return err
+				}
+				//now we don't need the tracker anymore, we erase it to use it to see who votes
+				//rs.tracker = make(map[int]int)
 			}
 		}
+		rs.mutex.Unlock()
 	}
 	return nil
 }
@@ -190,35 +208,40 @@ func (rs *RandShare) HandleS1(step StructS1) error {
 
 	msg := &step.S1
 
-	rs.mutex.Lock()
-	rs.S[msg.Src] = 1
-	rs.mutex.Unlock()
+	if !bytes.Equal(msg.SessionID, rs.sessionID) || rs.votes[msg.Src].Voted {
+		return nil //If the sessionID is not correct or we already have a vote from that node we don't deal with the message
+	}
 
-	if len(rs.S) == rs.nodes { //everyone can recover everything
-		//we decrypt our shares one by one and send them (we put them in the Share struct before)
-		var decShares []*Share //to store our dec shares
-		for j := 0; j < rs.nodes; j++ {
-			if encShare, ok := rs.encShares[j][rs.Index()]; ok { //we have an encrypted share
-				decShare, err := pvss.DecShare(rs.Suite(), rs.H, rs.X[rs.Index()], rs.pubPolys[j].Eval(rs.Index()).V, rs.Private(), encShare)
-				if err != nil {
-					return err
-				}
-				decShareStruct := &Share{Src: j, PubVerShare: decShare}
-				decShares = append(decShares, decShareStruct)
+	for index, vote := range msg.Votes {
+		rs.votes[index].Vote += vote.Vote
+	}
+	rs.votes[msg.Src].Voted = true
 
-				//the share is correct we store it
-				rs.mutex.Lock()
-				rs.decShares[j][rs.Index()] = decShare
-				rs.mutex.Unlock()
+	for _, vote := range rs.votes {
+		if vote.Voted == false { //one node hasn't voted yet
+			return nil
+		}
+	}
+	//if we reach this step, everyone voted so we can sent our dec shares
+	var decShares []*Share //to store our dec shares
+	for j := 0; j < rs.nodes; j++ {
+		if encShare, ok := rs.encShares[j][rs.Index()]; ok { //we have an encrypted share
+			decShare, err := pvss.DecShare(rs.Suite(), rs.H, rs.X[rs.Index()], rs.pubPolys[j].Eval(rs.Index()).V, rs.Private(), encShare)
+			if err != nil {
+				return err
 			}
+			decShareStruct := &Share{Src: j, PubVerShare: decShare}
+			decShares = append(decShares, decShareStruct)
+			//the share is correct we store it
+			rs.mutex.Lock()
+			rs.decShares[j][rs.Index()] = decShare
+			rs.mutex.Unlock()
 		}
-
-		//we brodcast our decShares
-		reply := &R1{SessionID: rs.sessionID, Src: rs.Index(), Shares: decShares}
-		//time.Sleep(100 * time.Millisecond)
-		if err := rs.Broadcast(reply); err != nil {
-			return err
-		}
+	}
+	//we brodcast our decShares
+	reply := &R1{SessionID: rs.sessionID, Src: rs.Index(), Shares: decShares}
+	if err := rs.Broadcast(reply); err != nil {
+		return err
 	}
 	return nil
 }
@@ -229,19 +252,18 @@ func (rs *RandShare) HandleR1(reply StructR1) error {
 	msg := &reply.R1
 
 	if !bytes.Equal(msg.SessionID, rs.sessionID) {
-		//log.LLvlf1("STUCK %d, nodes %d, faulty %d, purpose %s, time %d", rs.Index(), rs.nodes, rs.faulty, rs.purpose, rs.startingTime)
 		return nil //If the sessionID is not correct we don't deal with the reply
 	}
-	//log.LLvlf1("HERE for node %d with encshares %+v \n and dechshares \n %+v", rs.Index(), rs.encShares, rs.decShares)
 
 	for _, share := range msg.Shares {
 		//for every share, if the secret is not computed yet for the share.src, we store threshold correct shares and recover the secret
 		if _, ok := rs.secrets[share.Src]; !ok {
-			if _, ok = rs.encShares[share.Src][share.PubVerShare.S.I]; ok {
-				if err := pvss.VerifyDecShare(rs.Suite(), nil, rs.X[share.PubVerShare.S.I], rs.encShares[share.Src][share.PubVerShare.S.I], share.PubVerShare); err == nil {
-					rs.mutex.Lock()
-					rs.decShares[share.Src][share.PubVerShare.S.I] = share.PubVerShare
-					rs.mutex.Unlock()
+			if encShare, ok := rs.encShares[share.Src][msg.Src]; ok {
+				rs.mutex.Lock()
+				if err := pvss.VerifyDecShare(rs.Suite(), nil, rs.X[msg.Src], encShare, share.PubVerShare); err == nil {
+					//rs.mutex.Lock()
+					rs.decShares[share.Src][msg.Src] = share.PubVerShare
+					//rs.mutex.Unlock()
 				}
 
 				if len(rs.decShares[share.Src]) == rs.threshold { //we can recover src-th secret
@@ -250,10 +272,10 @@ func (rs *RandShare) HandleR1(reply StructR1) error {
 					var keys []abstract.Point
 
 					for i := 0; i < rs.nodes; i++ {
-						if encShare, ok := rs.encShares[share.Src][i]; ok { //we have a encrypted share => we have a decShare
+						if encShare2, ok := rs.encShares[share.Src][i]; ok { //we have a encrypted share => we have a decShare
 							//we construct goodKeys and goddEncShares depending on
 							if decShare, ok := rs.decShares[share.Src][i]; ok {
-								encShareList = append(encShareList, encShare)
+								encShareList = append(encShareList, encShare2)
 								decShareList = append(decShareList, decShare)
 								keys = append(keys, rs.X[i])
 							}
@@ -262,21 +284,30 @@ func (rs *RandShare) HandleR1(reply StructR1) error {
 
 					secret, err := pvss.RecoverSecret(rs.Suite(), nil, keys, encShareList, decShareList, rs.threshold, rs.nodes)
 					if err != nil {
+						//log.LLvlf1("\nNOPE for node %d and secret %d \nencshares %+v \ndechshares %+v", rs.Index(), share.Src, rs.encShares, rs.decShares)
 						return err
+					} else {
+						//log.LLvlf1("\nOK for node %d and secret %d \nencshares %+v \ndechshares %+v", rs.Index(), share.Src, rs.encShares, rs.decShares)
 					}
-					rs.mutex.Lock()
+
+					//rs.mutex.Lock()
 					rs.secrets[share.Src] = secret
-					rs.mutex.Unlock()
+					//rs.mutex.Unlock()
 				}
+				rs.mutex.Unlock()
 			}
+
 			if (len(rs.secrets) == rs.nodes) && !rs.coStringReady {
 				coString := rs.Suite().Point().Null()
 				for j := range rs.secrets {
-					abstract.Point.Add(coString, coString, rs.secrets[j])
+					if rs.votes[j].Vote > rs.faulty {
+						abstract.Point.Add(coString, coString, rs.secrets[j])
+					}
 				}
 				rs.mutex.Lock()
 				rs.coString = coString
 				rs.mutex.Unlock()
+				//log.LLvlf1("COSTRING RECOVERED AT NODE %d %+v", rs.Index(), coString)
 				rs.coStringReady = true
 				rs.Done <- true
 			}
@@ -310,7 +341,8 @@ func (rs *RandShare) Random() ([]byte, *Transcript, error) {
 		PubPolys:  rs.pubPolys,
 		EncShares: rs.encShares,
 		DecShares: rs.decShares,
-		secrets:   rs.secrets,
+		Votes:     rs.votes,
+		Secrets:   rs.secrets,
 	}
 	return rb, transcript, nil
 }
@@ -343,7 +375,7 @@ func Verify(random []byte, transcript *Transcript) error {
 	}
 
 	//verification of secrets
-	for secretID, secretTransc := range transcript.secrets {
+	for secretID, secretTransc := range transcript.Secrets {
 
 		//first we construct list of shares we use
 		var encShareList []*pvss.PubVerShare
@@ -366,8 +398,8 @@ func Verify(random []byte, transcript *Transcript) error {
 
 	//verification of the final coString
 	coString := transcript.Suite.Point().Null()
-	for j := range transcript.secrets {
-		abstract.Point.Add(coString, coString, transcript.secrets[j])
+	for j := range transcript.Secrets {
+		abstract.Point.Add(coString, coString, transcript.Secrets[j])
 	}
 	bs, err := coString.MarshalBinary()
 	if err != nil {
