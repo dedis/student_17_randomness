@@ -37,22 +37,18 @@ func (rs *RandShare) Setup(nodes int, faulty int, purpose string, time int64) er
 	rs.faulty = faulty
 	rs.threshold = faulty + 1
 	rs.purpose = purpose
+	
 	rs.X = make([]abstract.Point, rs.nodes)
-	for j := 0; j < rs.nodes; j++ {
-		rs.X[j] = rs.List()[j].ServerIdentity.Public
-	}
-
 	rs.sessionID = SessionID(rs.Suite(), rs.nodes, rs.faulty, rs.X, rs.purpose, time)
 	rs.H, _ = rs.Suite().Point().Pick(nil, rs.Suite().Cipher(rs.sessionID))
-
 	rs.pubPolys = make([]*share.PubPoly, rs.nodes)
 	rs.encShares = make(map[int]map[int]*pvss.PubVerShare)
 	rs.tracker = make(map[int]int)
 	rs.votes = make(map[int]*Vote)
-
 	rs.decShares = make(map[int]map[int]*pvss.PubVerShare)
 
 	for i := 0; i < rs.nodes; i++ {
+		rs.X[i] = rs.List()[i].ServerIdentity.Public
 		rs.encShares[i] = make(map[int]*pvss.PubVerShare)
 		rs.decShares[i] = make(map[int]*pvss.PubVerShare)
 		rs.votes[i] = &Vote{Voted: false, Vote: 0}
