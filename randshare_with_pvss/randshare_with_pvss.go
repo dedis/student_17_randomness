@@ -399,7 +399,7 @@ func Verify(random []byte, transcript *Transcript) error {
 	//verification of the final coString
 	coString := transcript.Suite.Point().Null()
 	for j := range transcript.Secrets {
-		if transcript.Votes[j] > transcript.Faulty {
+		if transcript.Votes[j].Vote > transcript.Faulty {
 			abstract.Point.Add(coString, coString, transcript.Secrets[j])
 		}
 	}
