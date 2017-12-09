@@ -307,7 +307,7 @@ func (rs *RandShare) HandleR1(reply StructR1) error {
 				rs.mutex.Lock()
 				rs.coString = coString
 				rs.mutex.Unlock()
-				//log.LLvlf1("COSTRING RECOVERED AT NODE %d %+v", rs.Index(), coString)
+				log.LLvlf1("COSTRING RECOVERED AT NODE %d %+v", rs.Index(), coString)
 				rs.coStringReady = true
 				rs.Done <- true
 			}
@@ -399,7 +399,9 @@ func Verify(random []byte, transcript *Transcript) error {
 	//verification of the final coString
 	coString := transcript.Suite.Point().Null()
 	for j := range transcript.Secrets {
-		abstract.Point.Add(coString, coString, transcript.Secrets[j])
+		if transcript.Votes[j] > transcript.Faulty {
+			abstract.Point.Add(coString, coString, transcript.Secrets[j])
+		}
 	}
 	bs, err := coString.MarshalBinary()
 	if err != nil {
