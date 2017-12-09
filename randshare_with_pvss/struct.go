@@ -16,8 +16,8 @@ const Name = "RandShare"
 
 //init registers the handlers
 func init() {
-	for _, p := range []interface{}{A1{}, S1{}, R1{},
-		StructA1{}, StructS1{}, StructR1{}} {
+	for _, p := range []interface{}{A1{}, V1{}, R1{},
+		StructA1{}, StructV1{}, StructR1{}} {
 		network.RegisterMessage(p)
 	}
 }
@@ -52,18 +52,18 @@ type StructA1 struct {
 	A1             //The announce
 }
 
-//S1 is the vote
-type S1 struct {
+//V1 is the vote
+type V1 struct {
 	SessionID []byte        //SessionID to verify the validity
 	Src       int           //The sender
 	Votes     map[int]*Vote //The votes
 }
 
-// StructR1 just contains S1 and the data necessary to identify and
+// StructR1 just contains V1 and the data necessary to identify and
 // process the message in the sda framework.
-type StructS1 struct {
+type StructV1 struct {
 	*onet.TreeNode //The tree
-	S1             //The reply
+	V1             //The reply
 }
 
 // R1 is the reply.
