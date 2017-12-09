@@ -24,7 +24,7 @@ func NewRandShare(n *onet.TreeNodeInstance) (onet.ProtocolInstance, error) {
 	t := &RandShare{
 		TreeNodeInstance: n,
 	}
-	err := t.RegisterHandlers(t.HandleA1, t.HandleS1, t.HandleR1)
+	err := t.RegisterHandlers(t.HandleA1, t.HandleV1, t.HandleR1)
 	return t, err
 }
 
@@ -175,7 +175,7 @@ func (rs *RandShare) HandleA1(announce StructA1) error {
 				}
 			}
 			//we say that we are done storing, we send our votes
-			step := &S1{SessionID: rs.sessionID, Src: rs.Index(), Votes: rs.votes}
+			step := &V1{SessionID: rs.sessionID, Src: rs.Index(), Votes: rs.votes}
 			if err := rs.Broadcast(step); err != nil {
 				return err
 			}
@@ -185,10 +185,10 @@ func (rs *RandShare) HandleA1(announce StructA1) error {
 	return nil
 }
 
-//HandleS1 sends the decrypted shares when everyone is done storing their encrypted shares
-func (rs *RandShare) HandleS1(step StructS1) error {
+//HandleV1 sends the decrypted shares when everyone is done storing their encrypted shares
+func (rs *RandShare) HandleV1(step StructV1) error {
 
-	msg := &step.S1
+	msg := &step.V1
 
 	if !bytes.Equal(msg.SessionID, rs.sessionID) || rs.votes[msg.Src].Voted {
 		return nil //If the sessionID is not correct or we already have a vote from that node we don't deal with the message

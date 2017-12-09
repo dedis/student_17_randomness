@@ -22,15 +22,16 @@ func init() {
 	}
 }
 
-//Share is used to send the share along with its coordinates in the matrix encShare : (Src, PubVerShare.S.I)
+//Share is used to send the share along with its position in the matrix encShare : (Src, PubVerShare.S.I)
 type Share struct {
 	Src         int               //The source
 	PubVerShare *pvss.PubVerShare //The share
 }
 
+//Vote is a struct used to gather infromation about a node during the voting process
 type Vote struct {
-	Voted bool //a boolean to verify that a certain node doesn't vote twice
-	Vote  int  //The vote associated to that node
+	Voted bool //Did this node vote already ?
+	Vote  int  //The collective vote associated to that node
 }
 
 // A1 is the announce.
@@ -44,14 +45,14 @@ type A1 struct {
 	Time      int64               //time given by initializer to compute sessionID
 }
 
-// StructA1 just contains Announce and the data necessary to identify and
+//StructA1 just contains Announce and the data necessary to identify and
 // process the message in the sda framework.
 type StructA1 struct {
 	*onet.TreeNode //The tree
 	A1             //The announce
 }
 
-//S1 is sent when a node reaches the 1st step.
+//S1 is the vote
 type S1 struct {
 	SessionID []byte        //SessionID to verify the validity
 	Src       int           //The sender
