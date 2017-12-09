@@ -12,6 +12,7 @@ func TestRandShare(t *testing.T) {
 
 	var name = "RandShare"
 	var nodes = 13
+	// 2/3 would prevent network splitting attacks
 	var faulty = nodes / 3
 	var purpose = "RandShare test run"
 

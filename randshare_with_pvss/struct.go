@@ -101,6 +101,7 @@ type RandShare struct {
 	mutex                  sync.Mutex                        //Mutex to avoid concurrency
 	*onet.TreeNodeInstance                                   //The tree of nodes
 	nodes                  int                               //Number of nodes
+	nPrime                 int                               //Number of "good nodes" after voting process
 	faulty                 int                               //Number of faulty nodes
 	threshold              int                               //The threshold to recover values
 	purpose                string                            //The purpose of the protocol
