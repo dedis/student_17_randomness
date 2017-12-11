@@ -80,7 +80,7 @@ func (rss *RSSimulation) Run(config *onet.SimulationConfig) error {
 		log.Lvlf1("RandShare - verification: ok")
 
 	case <-time.After(time.Second * time.Duration(rss.Hosts) * 10):
-		log.Print("RansShare - time out")
+		log.Print("RandShare - time out")
 	}
 
 	return nil
