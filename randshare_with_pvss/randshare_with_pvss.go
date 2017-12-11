@@ -258,23 +258,21 @@ func (rs *RandShare) HandleR1(reply StructR1) error {
 					rs.mutex.Unlock()
 				}
 
-				if len(rs.decShares[share.Src]) == rs.threshold { //we can recover src-th secret
+				if len(rs.decShares[share.Src]) == rs.threshold+1 { //we can recover src-th secret
+					//if len(rs.decShares[share.Src]) == rs.threshold { //we can recover src-th secret
 					var encShareList []*pvss.PubVerShare
 					var decShareList []*pvss.PubVerShare
 					var keys []abstract.Point
 
 					for i := 0; i < rs.nodes; i++ {
-						encShare2, ok2 := rs.encShares[share.Src][i]
-						decShare, ok := rs.decShares[share.Src][i]
-						if ok && ok2 { //we have a encrypted share and a decShare
-							encShareList = append(encShareList, encShare2)
+						if decShare, ok := rs.decShares[share.Src][i]; ok {
+							encShareList = append(encShareList, rs.encShares[share.Src][i]) //we are sure to have an encShare as we verified it
 							decShareList = append(decShareList, decShare)
 							keys = append(keys, rs.X[i])
-
 						}
 					}
 
-					secret, err := pvss.RecoverSecret(rs.Suite(), nil, keys, encShareList, decShareList, rs.threshold, rs.nodes)
+					secret, err := pvss.RecoverSecret(rs.Suite(), nil, keys, encShareList, decShareList, rs.threshold, rs.nPrime)
 					if err != nil {
 						mapE := make(map[int]*pvss.PubVerShare)
 						mapD := make(map[int]*pvss.PubVerShare)
@@ -282,12 +280,15 @@ func (rs *RandShare) HandleR1(reply StructR1) error {
 							mapE[share.S.I] = share
 						}
 						for _, share := range decShareList {
-							mapE[share.S.I] = share
+							mapD[share.S.I] = share
 						}
-						log.LLvlf1("\nNOPE for node %d and secret %d \nLISTS :\nencshares %+v \ndechshares %+v \nMAP\nencshares %+v \ndechshares %+v", rs.Index(), share.Src, encShareList, decShareList, mapE, mapD)
+						log.LLvlf1("LISTS :\nencshares %+v \ndechshares %+v \nMAP\nencshares %+v \ndechshares %+v", encShareList, decShareList, mapE, mapD)
+						for i := 0; i < len(keys); i++ {
+							if err = pvss.VerifyDecShare(rs.Suite(), nil, keys[i], encShareList[i], decShareList[i]); err != nil {
+								log.LLvlf1("err for rs.Index %d, share %d at index %d with key %+v compared to ours %+v", rs.Index(), encShareList[i].S.I, i, keys[i], rs.X[rs.Index()])
+							}
+						}
 						return err
-					} else {
-						//log.LLvlf1("\nOK for node %d and secret %d \nencshares %+v \ndechshares %+v", rs.Index(), share.Src, rs.encShares, rs.decShares)
 					}
 
 					rs.mutex.Lock()
