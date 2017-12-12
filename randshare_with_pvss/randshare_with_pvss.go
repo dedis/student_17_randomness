@@ -227,7 +227,7 @@ func (rs *RandShare) HandleV1(step StructV1) error {
 			rs.mutex.Lock()
 			rs.decShares[j][rs.Index()] = decShare
 			rs.mutex.Unlock()
-			decShareStruct := &Share{Src: j, PubVerShare: decShare}
+			decShareStruct := &Share{Row: j, PubVerShare: decShare}
 			decShares = append(decShares, decShareStruct)
 		}
 	}
@@ -250,15 +250,15 @@ func (rs *RandShare) HandleR1(reply StructR1) error {
 	rs.tracker[msg.Src] = 1 //we received something
 	rs.mutex.Unlock()
 	for _, shareWr := range msg.Shares {
-		if _, ok := rs.secrets[shareWr.Src]; !ok || (rs.votes[shareWr.Src].Vote <= rs.faulty) { //if the share.src-th secret is already recovered or has too many negative votes we don't deal with this share
-			if encShare, ok := rs.encShares[shareWr.Src][msg.Src]; ok {
+		if _, ok := rs.secrets[shareWr.Row]; !ok || (rs.votes[shareWr.Row].Vote <= rs.faulty) { //if the share.src-th secret is already recovered or has too many negative votes we don't deal with this share
+			if encShare, ok := rs.encShares[shareWr.Row][msg.Src]; ok {
 				if err := pvss.VerifyDecShare(rs.Suite(), nil, rs.X[msg.Src], encShare, shareWr.PubVerShare); err == nil {
 					rs.mutex.Lock()
-					rs.decShares[shareWr.Src][msg.Src] = shareWr.PubVerShare
+					rs.decShares[shareWr.Row][msg.Src] = shareWr.PubVerShare
 					rs.mutex.Unlock()
 				}
 
-				if len(rs.decShares[shareWr.Src]) == rs.threshold { //we can recover src-th secret
+				if len(rs.decShares[shareWr.Row]) == rs.threshold { //we can recover src-th secret
 
 					//if len(rs.decShares[share.Src]) == rs.threshold + 1 { +1 as cant verif own share
 					var encShareList []*pvss.PubVerShare
@@ -266,8 +266,8 @@ func (rs *RandShare) HandleR1(reply StructR1) error {
 					var keys []abstract.Point
 
 					for i := 0; i < rs.nodes; i++ {
-						if decShare, ok := rs.decShares[shareWr.Src][i]; ok {
-							encShareList = append(encShareList, rs.encShares[shareWr.Src][i]) //we are sure to have an encShare as we verified it
+						if decShare, ok := rs.decShares[shareWr.Row][i]; ok {
+							encShareList = append(encShareList, rs.encShares[shareWr.Row][i]) //we are sure to have an encShare as we verified it
 							decShareList = append(decShareList, decShare)
 							keys = append(keys, rs.X[i])
 						}
@@ -279,7 +279,7 @@ func (rs *RandShare) HandleR1(reply StructR1) error {
 					}
 
 					rs.mutex.Lock()
-					rs.secrets[shareWr.Src] = secret
+					rs.secrets[shareWr.Row] = secret
 					rs.mutex.Unlock()
 				}
 			}

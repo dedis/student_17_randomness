@@ -24,7 +24,7 @@ func init() {
 
 //Share is used to send the share along with its position in the matrix encShare : (Src, PubVerShare.S.I)
 type Share struct {
-	Src         int               //The source
+	Row         int               //The position of the share
 	PubVerShare *pvss.PubVerShare //The share
 }
 
