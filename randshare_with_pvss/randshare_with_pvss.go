@@ -37,7 +37,8 @@ func (rs *RandShare) Setup(nodes int, faulty int, purpose string, time int64) er
 	rs.faulty = faulty
 	rs.threshold = faulty + 1
 	rs.purpose = purpose
-	rs.X = make([]abstract.Point, rs.nodes)
+	rs.X = rs.Roster().Publics()
+	//rs.X = make([]abstract.Point, rs.nodes)
 	rs.pubPolys = make([]*share.PubPoly, rs.nodes)
 	rs.encShares = make(map[int]map[int]*pvss.PubVerShare)
 	rs.tracker = make(map[int]int)
@@ -45,7 +46,7 @@ func (rs *RandShare) Setup(nodes int, faulty int, purpose string, time int64) er
 	rs.decShares = make(map[int]map[int]*pvss.PubVerShare)
 
 	for i := 0; i < rs.nodes; i++ {
-		rs.X[i] = rs.List()[i].ServerIdentity.Public
+		//rs.X[i] = rs.List()[i].ServerIdentity.Public
 		rs.encShares[i] = make(map[int]*pvss.PubVerShare)
 		rs.decShares[i] = make(map[int]*pvss.PubVerShare)
 		rs.votes[i] = &Vote{Voted: false, Vote: 0}
@@ -247,9 +248,8 @@ func (rs *RandShare) HandleR1(reply StructR1) error {
 	if _, ok := rs.tracker[msg.Src]; ok || !bytes.Equal(msg.SessionID, rs.sessionID) {
 		return nil //If the sessionID is not correct or we had decrypted shares from that node already, we don't deal with the reply
 	}
-
 	rs.mutex.Lock()
-	rs.tracker[msg.Src] = 1
+	rs.tracker[msg.Src] = 1 //we received something
 	rs.mutex.Unlock()
 	for _, shareWr := range msg.Shares {
 		if _, ok := rs.secrets[shareWr.Src]; !ok || (rs.votes[shareWr.Src].Vote <= rs.faulty) { //if the share.src-th secret is already recovered or has too many negative votes we don't deal with this share
@@ -259,10 +259,13 @@ func (rs *RandShare) HandleR1(reply StructR1) error {
 					rs.decShares[shareWr.Src][msg.Src] = shareWr.PubVerShare
 					rs.mutex.Unlock()
 				} else {
+					//	log.LLvlf1("got here for %d ", rs.Index())
+
 					if rs.Index() == 0 {
-						log.LLvlf1("got here for %d with err %+v", rs.Index(), err)
+						//	log.LLvlf1("got here for %d with err %+v", rs.Index(), err)
 					}
 				}
+
 				if len(rs.decShares[shareWr.Src]) == rs.threshold { //we can recover src-th secret
 
 					//if len(rs.decShares[share.Src]) == rs.threshold + 1 { +1 as cant verif own share
@@ -280,7 +283,7 @@ func (rs *RandShare) HandleR1(reply StructR1) error {
 
 					secret, err := pvss.RecoverSecret(rs.Suite(), nil, keys, encShareList, decShareList, rs.threshold, rs.nPrime)
 					if err != nil {
-						/* beg of tests*/
+						/* beg of tests
 						mapE := make(map[int]*pvss.PubVerShare)
 						mapD := make(map[int]*pvss.PubVerShare)
 						for _, share2 := range encShareList {
@@ -320,7 +323,7 @@ func (rs *RandShare) HandleR1(reply StructR1) error {
 				rs.Done <- true
 			}
 		} else {
-			log.LLvlf1("in the else")
+			//log.LLvlf1("in the else")
 		}
 	}
 	return nil
