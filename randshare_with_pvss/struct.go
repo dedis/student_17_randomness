@@ -94,7 +94,6 @@ type Transcript struct {
 	PubPolys  []*share.PubPoly                  //The pubPoly of every node
 	DecShares map[int]map[int]*pvss.PubVerShare //The matrix of decrypted shares
 	Votes     map[int]*Vote                     //The votes
-	Secrets   map[int]abstract.Point            //The recovered secrets
 }
 
 //RandShare is our protocol struct

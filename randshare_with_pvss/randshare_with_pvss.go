@@ -12,7 +12,7 @@ import (
 	"gopkg.in/dedis/crypto.v0/share/pvss"
 	"gopkg.in/dedis/onet.v1"
 	"gopkg.in/dedis/onet.v1/crypto"
-	"gopkg.in/dedis/onet.v1/log"
+	//"gopkg.in/dedis/onet.v1/log"
 )
 
 func init() {
@@ -38,7 +38,6 @@ func (rs *RandShare) Setup(nodes int, faulty int, purpose string, time int64) er
 	rs.threshold = faulty + 1
 	rs.purpose = purpose
 	rs.X = rs.Roster().Publics()
-	//rs.X = make([]abstract.Point, rs.nodes)
 	rs.pubPolys = make([]*share.PubPoly, rs.nodes)
 	rs.encShares = make(map[int]map[int]*pvss.PubVerShare)
 	rs.tracker = make(map[int]int)
@@ -46,7 +45,6 @@ func (rs *RandShare) Setup(nodes int, faulty int, purpose string, time int64) er
 	rs.decShares = make(map[int]map[int]*pvss.PubVerShare)
 
 	for i := 0; i < rs.nodes; i++ {
-		//rs.X[i] = rs.List()[i].ServerIdentity.Public
 		rs.encShares[i] = make(map[int]*pvss.PubVerShare)
 		rs.decShares[i] = make(map[int]*pvss.PubVerShare)
 		rs.votes[i] = &Vote{Voted: false, Vote: 0}
@@ -258,12 +256,6 @@ func (rs *RandShare) HandleR1(reply StructR1) error {
 					rs.mutex.Lock()
 					rs.decShares[shareWr.Src][msg.Src] = shareWr.PubVerShare
 					rs.mutex.Unlock()
-				} else {
-					//	log.LLvlf1("got here for %d ", rs.Index())
-
-					if rs.Index() == 0 {
-						//	log.LLvlf1("got here for %d with err %+v", rs.Index(), err)
-					}
 				}
 
 				if len(rs.decShares[shareWr.Src]) == rs.threshold { //we can recover src-th secret
@@ -283,24 +275,6 @@ func (rs *RandShare) HandleR1(reply StructR1) error {
 
 					secret, err := pvss.RecoverSecret(rs.Suite(), nil, keys, encShareList, decShareList, rs.threshold, rs.nPrime)
 					if err != nil {
-						/* beg of tests
-						mapE := make(map[int]*pvss.PubVerShare)
-						mapD := make(map[int]*pvss.PubVerShare)
-						for _, share2 := range encShareList {
-							mapE[share2.S.I] = share2
-						}
-						for _, share2 := range decShareList {
-							mapD[share2.S.I] = share2
-						}
-						D, _ := pvss.VerifyDecShareBatch(rs.Suite(), nil, keys, encShareList, decShareList)
-						log.LLvlf1("err %+v thres %d \nencshares %+v \ndechshares %+v \n D %+v", err, rs.threshold, mapE, mapD, D)
-						for i := 0; i < len(keys); i++ {
-							if err3 := pvss.VerifyDecShare(rs.Suite(), nil, keys[i], encShareList[i], decShareList[i]); err3 != nil {
-								//public key should be good as keys[i].Equal(rs.X[rs.Index()])
-								log.LLvlf1("err %+v for rs.Index %d, share %d at index %d", err3, rs.Index(), encShareList[i].S.I, i)
-							}
-						}
-						/*end of test*/
 						return err
 					}
 
@@ -318,12 +292,10 @@ func (rs *RandShare) HandleR1(reply StructR1) error {
 				rs.mutex.Lock()
 				rs.coString = coString
 				rs.mutex.Unlock()
-				log.LLvlf1("COSTRING RECOVERED AT NODE %d %+v", rs.Index(), coString)
+				//log.LLvlf1("COSTRING RECOVERED AT NODE %d %+v", rs.Index(), coString)
 				rs.coStringReady = true
 				rs.Done <- true
 			}
-		} else {
-			//log.LLvlf1("in the else")
 		}
 	}
 	return nil
@@ -355,7 +327,6 @@ func (rs *RandShare) Random() ([]byte, *Transcript, error) {
 		EncShares: rs.encShares,
 		DecShares: rs.decShares,
 		Votes:     rs.votes,
-		Secrets:   rs.secrets,
 	}
 	return rb, transcript, nil
 }
@@ -387,32 +358,31 @@ func Verify(random []byte, transcript *Transcript) error {
 		}
 	}
 
-	//verification of secrets
-	for secretID, secretTransc := range transcript.Secrets {
+	//verification of the final coString
+	//first we compute the good secrets
+	var secrets []abstract.Point
+	for id, vote := range transcript.Votes {
+		if vote.Vote > transcript.Faulty {
+			var encShareList []*pvss.PubVerShare
+			var decShareList []*pvss.PubVerShare
+			var keys []abstract.Point
+			for j, share := range transcript.DecShares[id] {
+				encShareList = append(encShareList, transcript.EncShares[id][j])
+				decShareList = append(decShareList, share)
+				keys = append(keys, transcript.X[j])
+			}
 
-		//first we construct list of shares we use
-		var encShareList []*pvss.PubVerShare
-		var decShareList []*pvss.PubVerShare
-		var keys []abstract.Point
-		for j, share := range transcript.DecShares[secretID] {
-			encShareList = append(encShareList, transcript.EncShares[secretID][j])
-			decShareList = append(decShareList, share)
-			keys = append(keys, transcript.X[j])
-		}
-
-		secret, err := pvss.RecoverSecret(transcript.Suite, nil, keys, encShareList, decShareList, transcript.Faulty+1, transcript.Nodes)
-		if err != nil {
-			return err
-		}
-		if !secret.Equal(secretTransc) {
-			return errors.New("Secret recovered is not correct")
+			secret, err := pvss.RecoverSecret(transcript.Suite, nil, keys, encShareList, decShareList, transcript.Faulty+1, transcript.Nodes)
+			if err != nil {
+				return err
+			}
+			secrets = append(secrets, secret)
 		}
 	}
-
-	//verification of the final coString
+	//then we combine them
 	coString := transcript.Suite.Point().Null()
-	for j := range transcript.Secrets {
-		abstract.Point.Add(coString, coString, transcript.Secrets[j])
+	for _, secret := range secrets {
+		abstract.Point.Add(coString, coString, secret)
 	}
 	bs, err := coString.MarshalBinary()
 	if err != nil {
