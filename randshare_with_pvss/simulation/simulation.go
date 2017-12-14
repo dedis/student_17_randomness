@@ -67,6 +67,7 @@ func (rss *RSSimulation) Run(config *onet.SimulationConfig) error {
 		if err != nil {
 			return err
 		}
+		log.Lvlf1("Collective string : %x", random)
 		randM.Record()
 		bandW.Record()
 		log.Lvlf1("RandShare - collective randomness: ok")

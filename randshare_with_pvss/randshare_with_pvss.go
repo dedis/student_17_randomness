@@ -259,8 +259,6 @@ func (rs *RandShare) HandleR1(reply StructR1) error {
 				}
 
 				if len(rs.decShares[shareWr.Row]) == rs.threshold { //we can recover src-th secret
-
-					//if len(rs.decShares[share.Src]) == rs.threshold + 1 { +1 as cant verif own share
 					var encShareList []*pvss.PubVerShare
 					var decShareList []*pvss.PubVerShare
 					var keys []abstract.Point
