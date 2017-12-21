@@ -1,4 +1,4 @@
-Servers = 6
+Servers = 10
 Simulation = "RandSharePVSS"
 BF = 2
 Rounds = 1
