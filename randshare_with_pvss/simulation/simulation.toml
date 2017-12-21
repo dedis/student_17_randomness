@@ -1,9 +1,7 @@
-Servers = 4
+Servers = 6
 Simulation = "RandSharePVSS"
 BF = 2
 Rounds = 1
-Faulty = 0
-Purpose = "RandShare Test"
 
 Hosts
-15
+10

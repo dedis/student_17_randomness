@@ -51,7 +51,8 @@ func (rss *RSSimulation) Run(config *onet.SimulationConfig) error {
 	}
 	rs, _ := client.(*randsharepvss.RandShare)
 	strartingTime := time.Now().Unix()
-	err = rs.Setup(rss.Hosts, rss.Hosts/3, rss.Purpose, strartingTime)
+	//err = rs.Setup(rss.Hosts, rss.Hosts/3, rss.Purpose, strartingTime)
+	err = rs.Setup(rss.Hosts, rss.Hosts/3, "Test", strartingTime)
 	if err != nil {
 		return err
 	}
