@@ -1,12 +1,5 @@
 package randshare
 
-/*
-Struct holds the messages that will be sent around in the protocol. You have
-to define each message twice: once the actual message, and a second time
-with the `*onet.TreeNode` embedded. The latter is used in the handler-function
-so that it can find out who sent the message.
-*/
-
 import (
 	"sync"
 	"time"
@@ -29,10 +22,9 @@ func init() {
 
 // Announce is used to pass a message to all children.
 type Announce struct {
-	//share   share.PubShare
 	Src     int
 	Tgt     int
-	Share   share.PriShare
+	Share   *share.PriShare
 	B       abstract.Point
 	Commits []abstract.Point
 }
@@ -48,7 +40,7 @@ type StructAnnounce struct {
 type Reply struct {
 	Src  int
 	Tgt  int
-	Vote share.PriShare //positive : nil, negative : share
+	Vote *share.PriShare //positive : nil, negative : share
 }
 
 // StructReply just contains Reply and the data necessary to identify and
@@ -58,6 +50,7 @@ type StructReply struct {
 	Reply
 }
 
+//Commitment is sent as a vote
 type Commitment struct {
 	Src  int
 	Tgt  int
@@ -71,10 +64,11 @@ type StructCommitment struct {
 	Commitment
 }
 
+//Share is used to send the shares as well as the number of good nodes
 type Share struct {
 	Src    int
 	Tgt    int
-	Share  share.PriShare
+	Share  *share.PriShare
 	NPrime int
 }
 
@@ -85,36 +79,29 @@ type StructShare struct {
 	Share
 }
 
+//Vote gathers the negative and positive votes from all nodes
 type Vote struct {
-	PositiveCounter int
-	NegativeCounter int
+	PositiveCounter int //+1 if received a neg vote
+	NegativeCounter int //+1 if received a neg vote
 }
 
 type RandShare struct {
-	mutex sync.Mutex
-	*onet.TreeNodeInstance
-
-	faulty    int
-	nodes     int
-	threshold int
-	purpose   string
-	time      time.Time
-	nPrime    int
-	//secret    abstract.Scalar
-	//store announces that we receive
-	announces map[int]*Announce
-	//store replies before sending them 2.1 used in HandleAnnounce
-	replies map[int]*Reply
-	//keep track of votes for secret sj(0) used in HandleReply
-	votes map[int]*Vote
-	//keep track of commits before modif of tracker used in HandleCommitment
-	commits map[int]*Vote
-	//vector to keep trace of valid secret received (Vi) 2.5 used in HandleCommitment
-	tracker map[int]int
-	//store the shares for the recovery of the secret sj(0)
-	shares map[int]map[int]*share.PriShare
-	//store the recovered secrets to compute the collective random string
-	secrets       map[int]*abstract.Scalar
-	coStringReady bool
-	Done          chan bool
+	mutex                  sync.Mutex                      //mutex
+	*onet.TreeNodeInstance                                 //tree
+	faulty                 int                             //number of faulty nodes
+	nodes                  int                             //number of nodes
+	threshold              int                             //threhold (faulty + 1)
+	purpose                string                          //purpose of protocol run
+	time                   time.Time                       //time ellapsed since protocol started
+	nPrime                 int                             //number of nodes after voting
+	announces              map[int]*Announce               //store announces that we receive
+	replies                map[int]*Reply                  //store replies before sending them 2.1 used in HandleAnnounce
+	votes                  map[int]*Vote                   //keep track of votes for secret sj(0) used in HandleReply
+	commits                map[int]*Vote                   //keep track of commits before modif of tracker used in HandleCommitment
+	tracker                map[int]int                     //vector to keep trace of valid secret received (Vi) 2.5 used in HandleCommitment
+	shares                 map[int]map[int]*share.PriShare //store the shares for the recovery of the secret sj(0)
+	secrets                map[int]*abstract.Scalar        //store the recovered secrets to compute the collective random string
+	coString               abstract.Scalar                 //collective string
+	coStringReady          bool                            //is the collective string computed yet ?
+	Done                   chan bool                       //are we done ?
 }

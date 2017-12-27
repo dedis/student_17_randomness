@@ -57,23 +57,35 @@ func (rs *RandShare) Start() error {
 	pubPoly := priPoly.Commit(nil)
 	b, commits := pubPoly.Info()
 
-	//send share si(j) and send it
+	//send share si(j)
 	for j := 0; j < rs.nodes; j++ {
 
 		announce := &Announce{
 			Src:     rs.Index(),
 			Tgt:     j,
-			Share:   *shares[j],
+			Share:   shares[j],
 			B:       b,
 			Commits: commits,
 		}
-		if j != rs.Index() {
+
+		//.SendTo isn't working, for simulation purpose We replace it with a Brodcast
+		//and nodes will deal with a receive msg iff the msg.Tgt matches their Id
+		/*if j != rs.Index() {
 			if err := rs.SendTo(rs.List()[j], announce); err != nil {
 				return err
 			}
 		} else {
 			rs.announces[j] = announce
+		}*/
+		//============================================
+		if j == rs.Index() {
+			rs.announces[j] = announce
+			rs.replies[j] = &Reply{Src: j, Tgt: j}
 		}
+		if err := rs.Broadcast(announce); err != nil {
+			return err
+		}
+		//============================================
 	}
 	return nil
 }
@@ -81,7 +93,12 @@ func (rs *RandShare) Start() error {
 func (rs *RandShare) HandleAnnounce(announce StructAnnounce) error {
 
 	msg := &announce.Announce
-
+	//added for simulation purpose
+	//============================
+	if (msg.Tgt != rs.Index()) || (rs.Index() == msg.Src) {
+		return nil
+	}
+	//=============================
 	if rs.nodes == 0 { // if it's our first message, we set up rs and send our shares before anwsering
 		//setup of our node
 		nodes := len(rs.List())
@@ -98,37 +115,53 @@ func (rs *RandShare) HandleAnnounce(announce StructAnnounce) error {
 			announce := &Announce{
 				Src:     rs.Index(),
 				Tgt:     j,
-				Share:   *shares[j],
+				Share:   shares[j],
 				B:       b,
 				Commits: commits,
 			}
-			if j != rs.Index() {
+			//.SendTo isn't working, for simulation purpose We replace it with a Brodcast
+			//and nodes will deal with a receive msg iff the msg.Tgt matches their Id
+			/*if j != rs.Index() {
 				if err := rs.SendTo(rs.List()[j], announce); err != nil {
 					return err
 				}
 			} else {
 				rs.announces[j] = announce
+			}*/
+			//============================================
+			if j == rs.Index() {
+				rs.announces[j] = announce
+				rs.replies[j] = &Reply{Src: j, Tgt: j}
 			}
+			if err := rs.Broadcast(announce); err != nil {
+				return err
+			}
+			//============================================
 		}
 	}
 
 	//now we can handle the announce
 	rs.announces[msg.Src] = msg
 	reply := &Reply{Src: rs.Index(), Tgt: msg.Src}
-
 	PubPoly := share.NewPubPoly(rs.Suite(), msg.B, msg.Commits)
-	shareIsCorrect := PubPoly.Check(&msg.Share)
+	shareIsCorrect := PubPoly.Check(msg.Share)
 	if !shareIsCorrect {
 		reply.Vote = msg.Share
 	}
 	rs.replies[msg.Src] = reply
-	if len(rs.replies) == (rs.nodes - 1) { //if each share arrived, we send them
+	//log.LLvlf1("id %d is storing for src %d, rep leng %d", rs.Index(), msg.Src, len(rs.replies))
+	if len(rs.replies) == rs.nodes { //if each share arrived (not our own), we send them
 		for j := 0; j < rs.nodes; j++ {
-			if j != rs.Index() {
-				if err := rs.Broadcast(rs.replies[j]); err != nil {
-					return err
-				}
+			//if j != rs.Index() {
+
+			/*if rs.replies[j] == nil {
+				log.LLvlf1("NEINE id %d vs j %d", rs.Index(), j)
+			}*/
+			//log.LLvlf1("id %d is brodcasting %+v", rs.Index(), rs.replies)
+			if err := rs.Broadcast(rs.replies[j]); err != nil {
+				return err
 			}
+
 		}
 	}
 	return nil
@@ -162,6 +195,7 @@ func (rs *RandShare) HandleReply(reply StructReply) error {
 			return err
 		}
 	}
+
 	return nil
 }
 
@@ -218,9 +252,9 @@ func (rs *RandShare) HandleShare(structShare StructShare) error {
 	if _, ok := rs.shares[msg.Src]; !ok {
 		rs.shares[msg.Src] = make(map[int]*share.PriShare)
 	}
-	rs.shares[msg.Src][msg.Tgt] = &msg.Share
+	rs.shares[msg.Src][msg.Tgt] = msg.Share
 
-	if len(rs.shares[msg.Src]) >= rs.threshold { //if we collected enough shares to recover sj(0)
+	if len(rs.shares[msg.Src]) == rs.threshold { //if we collected enough shares to recover sj(0)
 		//gathering shares sj() in a list
 		sharesList := make([]*share.PriShare, len(rs.shares[msg.Src]))
 		i := 0
@@ -242,9 +276,24 @@ func (rs *RandShare) HandleShare(structShare StructShare) error {
 			abstract.Scalar.Add(coString, coString, *rs.secrets[j])
 		}
 		//log.Lvlf1("Costring recovered at node %d is %+v", rs.Index(), coString)
+		rs.coString = coString
 		rs.coStringReady = true
 		rs.Done <- true
 	}
 
 	return nil
+}
+
+func (rs *RandShare) Random() ([]byte, error) {
+	rs.mutex.Lock()
+	defer rs.mutex.Unlock()
+
+	if !rs.coStringReady {
+		return nil, errors.New("Not ready")
+	}
+	rb, err := rs.coString.MarshalBinary()
+	if err != nil {
+		return nil, err
+	}
+	return rb, nil
 }
