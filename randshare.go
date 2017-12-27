@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/dedis/student_17_randomness/randsharepvss"
+	"github.com/dedis/student_17_randomness/randshare_with_pvss"
 	"gopkg.in/dedis/onet.v1"
 	"gopkg.in/dedis/onet.v1/log"
 	"time"
@@ -10,10 +10,9 @@ import (
 
 func main() {
 
-	fmt.Print("How many nodes would you like to work with ? (between 0 and 100) : ")
+	fmt.Print("How many nodes ?  [0; 100] : ")
 	var input int
 	fmt.Scanln(&input)
-	fmt.Print(input)
 
 	var name = "RandShare"
 	var nodes = input
@@ -24,13 +23,13 @@ func main() {
 	_, _, tree := local.GenTree(nodes, true)
 	defer local.CloseAll()
 
-	log.Lvlf1("randShare starting")
+	fmt.Print("RandShare starting\n")
 	protocol, err := local.CreateProtocol(name, tree)
 	if err != nil {
 		log.LLvlf1("couldn't initialize %s", err)
 		return
 	}
-	rs := protocol.(*RandShare)
+	rs := protocol.(*randsharepvss.RandShare)
 	startingTime := time.Now().Unix()
 	err = rs.Setup(nodes, faulty, purpose, startingTime)
 	if err != nil {
@@ -44,17 +43,18 @@ func main() {
 	}
 	select {
 	case <-rs.Done:
-		log.Lvlf1("RandShare done")
+		fmt.Print("RandShare done\n")
 		random, transcript, err := rs.Random()
+		fmt.Printf("Collective string : %x\n", random)
 		if err != nil {
 			log.LLvlf1("Random failed %s", err)
 			return
 		}
-		if err = Verify(random, transcript); err != nil {
+		if err = randsharepvss.Verify(random, transcript); err != nil {
 			log.LLvlf1("couldn't verify %s", err)
 			return
 		}
-		log.Lvlf1("RandShare verified")
+		fmt.Print("RandShare verified\n")
 	case <-time.After(time.Second * time.Duration(nodes) * 2):
 		log.LLvlf1("RandShare timeout")
 	}

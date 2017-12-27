@@ -5,3 +5,4 @@ randshare_with_pvss/simulation/deter.toml
 randshare/simulation/build
 randshare/simulation/deploy
 randshare/simulation/simulation.exe
+randshare.exe
