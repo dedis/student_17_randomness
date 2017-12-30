@@ -338,7 +338,7 @@ func Verify(random []byte, transcript *Transcript) error {
 		return errors.New("Wrong session identifier")
 	}
 
-	//verification of encrypted Shares
+	/*//verification of encrypted Shares
 	for rowID, encShareMap := range transcript.EncShares {
 		for colID, encShare := range encShareMap {
 			if err := pvss.VerifyEncShare(transcript.Suite, transcript.H, transcript.X[colID], transcript.PubPolys[rowID].Eval(colID).V, encShare); err != nil {
@@ -355,7 +355,7 @@ func Verify(random []byte, transcript *Transcript) error {
 			}
 		}
 	}
-
+	*/
 	//verification of the final coString
 	//first we compute the good secrets
 	var secrets []abstract.Point

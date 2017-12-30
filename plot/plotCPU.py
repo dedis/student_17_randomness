@@ -14,13 +14,13 @@ ax.set_yscale('log')
 randshare_val = (1.046875, 8.125, 85.515625, 676.390824, 0)
 #men_means = (20, 35, 30, 35, 27)
 #randshare
-rects1 = ax.bar(ind, randshare_val, width, color='y')
+rects1 = ax.bar(ind, randshare_val, width, color='c')
 
 #women_means = (25, 32, 34, 20, 25)
 randshare_pvss_val = (0.5, 2.904, 30.316, 444.116, 2970.450249)
 
 #ransharepvss
-rects2 = ax.bar(ind + width, randshare_pvss_val, width, color='r')
+rects2 = ax.bar(ind + width, randshare_pvss_val, width, color='#DC143C')
 
 # add some text for labels, title and axes ticks
 ax.set_ylabel('CPU usage in second')
@@ -29,9 +29,9 @@ ax.set_xlabel('Number of nodes')
 ax.set_xticks(ind + width / 2)
 ax.set_xticklabels(('8', '16', '32', '64', '128'))
 
-red_patch = mpatches.Patch(color='red', label='RandShare with PVSS')
-yellow_patch = mpatches.Patch(color='yellow', label='RandShare')
-plt.legend(handles=[red_patch, yellow_patch])
+yellow_patch = mpatches.Patch(color='c', label='RandShare')
+red_patch = mpatches.Patch(color='#DC143C', label='RandShare with PVSS')
+plt.legend(handles=[yellow_patch, red_patch])
 #ax.legend((rects2), ('RandShare with PVSS'))
 
 
