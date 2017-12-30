@@ -23,7 +23,7 @@ func main() {
 	_, _, tree := local.GenTree(nodes, true)
 	defer local.CloseAll()
 
-	fmt.Print("RandShare starting\n")
+	//fmt.Print("RandShare starting\n")
 	protocol, err := local.CreateProtocol(name, tree)
 	if err != nil {
 		log.LLvlf1("couldn't initialize %s", err)
@@ -43,9 +43,8 @@ func main() {
 	}
 	select {
 	case <-rs.Done:
-		fmt.Print("RandShare done\n")
 		random, transcript, err := rs.Random()
-		fmt.Printf("Collective string : %x\n", random)
+		fmt.Printf("Collective randomness : %x\nTime stamp %s\n", random, time.Unix(startingTime, 0))
 		if err != nil {
 			log.LLvlf1("Random failed %s", err)
 			return
@@ -54,7 +53,7 @@ func main() {
 			log.LLvlf1("couldn't verify %s", err)
 			return
 		}
-		fmt.Print("RandShare verified\n")
+		fmt.Print("Verification : ok\n")
 	case <-time.After(time.Second * time.Duration(nodes) * 2):
 		log.LLvlf1("RandShare timeout")
 	}
