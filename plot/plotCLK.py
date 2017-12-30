@@ -11,13 +11,15 @@ width = 0.3        # the width of the bars
 fig, ax = plt.subplots()
 ax.set_yscale('log')
 
-randshare_val = (1.851608, 2.669098, 26.431824, 476.390824, 0)
+randshare_val = (2.310495, 3.923671, 8.043795, 33.1127, 119.00754)
 #men_means = (20, 35, 30, 35, 27)
 #randshare
 rects1 = ax.bar(ind, randshare_val, width, color='c')
 
 #women_means = (25, 32, 34, 20, 25)
-randshare_pvss_val = (2.593622, 4.971902, 16.419024, 95.415956, 570.450249)
+#gen = (1.593877, 3.73225, 13.090557, 68.552564, 408.415956)
+#verif = (0.038001, 0.144006, 0.411729, 1.674715, 6.373575)
+randshare_pvss_val = (1.973887, 3.876256, 13.502286, 70.227279, 414.789531)
 
 #ransharepvss
 rects2 = ax.bar(ind + width, randshare_pvss_val, width, color='#DC143C')

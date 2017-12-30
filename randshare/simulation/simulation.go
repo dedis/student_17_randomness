@@ -71,8 +71,6 @@ func (rss *RSSimulation) Run(config *onet.SimulationConfig) error {
 		bandW.Record()
 		log.Lvlf1("RandShare - collective randomness: ok")
 
-		//verifyM := monitor.NewTimeMeasure("tver-randshare")
-
 	case <-time.After(time.Second * time.Duration(rss.Hosts) * 10):
 		log.Print("RandShare - time out")
 	}

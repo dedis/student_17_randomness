@@ -5,19 +5,19 @@ import matplotlib.patches as mpatches
 """(8, 16, 32, 64, 128)"""
 N = 5
 
-
 ind = np.arange(N)  # the x locations for the groups
 width = 0.3        # the width of the bars
 fig, ax = plt.subplots()
 ax.set_yscale('log')
 
-randshare_val = (1.046875, 8.125, 85.515625, 676.390824, 0)
+#CPU = user + system
+randshare_val = (0.092, 0.956, 10.244, 129.168, 1057.917)
 #men_means = (20, 35, 30, 35, 27)
 #randshare
 rects1 = ax.bar(ind, randshare_val, width, color='c')
 
 #women_means = (25, 32, 34, 20, 25)
-randshare_pvss_val = (0.5, 2.904, 30.316, 444.116, 2970.450249)
+randshare_pvss_val = (0.34, 2.372, 24.624, 408.768, 2970.450249)
 
 #ransharepvss
 rects2 = ax.bar(ind + width, randshare_pvss_val, width, color='#DC143C')
