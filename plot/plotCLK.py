@@ -5,24 +5,23 @@ import matplotlib.patches as mpatches
 """(8, 16, 32, 64, 128)"""
 N = 5
 
-
 ind = np.arange(N)  # the x locations for the groups
 width = 0.3        # the width of the bars
 fig, ax = plt.subplots()
 ax.set_yscale('log')
-#value for 128 nodes isn't from same simulation than others
-randshare_val = (2.310495, 3.923671, 8.043795, 33.1127, 119.00754)
-#men_means = (20, 35, 30, 35, 27)
-#randshare
-rects1 = ax.bar(ind, randshare_val, width, color='c')
 
-#women_means = (25, 32, 34, 20, 25)
-#gen = (1.593877, 3.73225, 13.090557, 68.552564, 408.415956)
-#verif = (0.038001, 0.144006, 0.411729, 1.674715, 6.373575)
-randshare_pvss_val = (1.001013, 2.369149, 9.803703, 65.270505, 414.789531)
+#value for 128 nodes isn't from same simulation than others
+
+#randshare
+randshare_val = (2.310495, 3.923671, 8.043795, 33.1127, 119.00754)
+p1 = plt.bar(ind, randshare_val, width, color='#9ACD32')
 
 #ransharepvss
-rects2 = ax.bar(ind + width, randshare_pvss_val, width, color='#DC143C')
+randshare_pvss_gen_val = (1.001013, 2.369149, 9.803703, 65.270505, 414.789531)
+randshare_pvss_ver_val = (0.179685, 0.784379, 4.383261, 27.47746, 193.04222)
+
+p2 = plt.bar(ind + width, randshare_pvss_gen_val, width, color='#6495ED')
+p3 = plt.bar(ind + width, randshare_pvss_ver_val, width, color='#000080', bottom=randshare_pvss_gen_val)
 
 # add some text for labels, title and axes ticks
 ax.set_ylabel('Wall clock time in second')
@@ -32,24 +31,10 @@ ax.set_xlabel('Number of nodes')
 ax.set_xticks(ind + width / 2)
 ax.set_xticklabels(('8', '16', '32', '64', '128'))
 
-yellow_patch = mpatches.Patch(color='c', label='RandShare')
-red_patch = mpatches.Patch(color='#DC143C', label='RandShare with PVSS')
+yellow_patch = mpatches.Patch(color='#9ACD32', label='RandShare Randomness Generation')
+red_patch = mpatches.Patch(color='#6495ED', label='RandSharePVSS Randomness Generation')
+pink_pach = mpatches.Patch(color='#000080', label='RandSharePVSS Transcript Verification')
 
-plt.legend(handles=[yellow_patch, red_patch])
-#ax.legend((rects2), ('RandShare with PVSS'))
-
-
-def autolabel(rects):
-    """
-    Attach a text label above each bar displaying its height
-    """
-    for rect in rects:
-        height = rect.get_height()
-        ax.text(rect.get_x() + rect.get_width()/2., 1.05*height,
-                '%d' % int(height),
-                ha='center', va='bottom')
-
-#autolabel(rects1)
-#autolabel(rects2)
+plt.legend(handles=[yellow_patch, red_patch, pink_pach])
 
 plt.show()
