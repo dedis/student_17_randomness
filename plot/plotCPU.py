@@ -11,7 +11,7 @@ fig, ax = plt.subplots()
 ax.set_yscale('log')
 
 #CPU = user + system
-randshare_val = (0.092, 0.956, 10.244, 129.168, 1057.917)
+randshare_val = (0.2, 0.956, 10.244, 129.168, 1057.917)
 #men_means = (20, 35, 30, 35, 27)
 #randshare
 rects1 = ax.bar(ind, randshare_val, width, color='c')
@@ -47,5 +47,5 @@ def autolabel(rects):
 
 #autolabel(rects1)
 #autolabel(rects2)
-
+ax.set_ylim(0, 3500)
 plt.show()

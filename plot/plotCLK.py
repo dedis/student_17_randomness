@@ -10,7 +10,7 @@ ind = np.arange(N)  # the x locations for the groups
 width = 0.3        # the width of the bars
 fig, ax = plt.subplots()
 ax.set_yscale('log')
-
+#value for 128 nodes isn't from same simulation than others
 randshare_val = (2.310495, 3.923671, 8.043795, 33.1127, 119.00754)
 #men_means = (20, 35, 30, 35, 27)
 #randshare
@@ -19,7 +19,7 @@ rects1 = ax.bar(ind, randshare_val, width, color='c')
 #women_means = (25, 32, 34, 20, 25)
 #gen = (1.593877, 3.73225, 13.090557, 68.552564, 408.415956)
 #verif = (0.038001, 0.144006, 0.411729, 1.674715, 6.373575)
-randshare_pvss_val = (1.973887, 3.876256, 13.502286, 70.227279, 414.789531)
+randshare_pvss_val = (1.001013, 2.369149, 9.803703, 65.270505, 414.789531)
 
 #ransharepvss
 rects2 = ax.bar(ind + width, randshare_pvss_val, width, color='#DC143C')

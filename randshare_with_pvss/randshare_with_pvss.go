@@ -141,8 +141,8 @@ func (rs *RandShare) HandleA1(announce StructA1) error {
 	for _, share := range msg.Shares {
 		shareIndex := share.S.I
 		value := pubPolySrc.Eval(shareIndex).V
-
-		if err := pvss.VerifyEncShare(rs.Suite(), rs.H, rs.X[shareIndex], value, share); err == nil {
+		_, ok := rs.tracker[msg.Src]
+		if err := pvss.VerifyEncShare(rs.Suite(), rs.H, rs.X[shareIndex], value, share); err == nil && !ok {
 			//share is correct, we store it in the encShares map
 			//	rs.mutex.Lock()
 			rs.encShares[msg.Src][shareIndex] = share
@@ -153,25 +153,22 @@ func (rs *RandShare) HandleA1(announce StructA1) error {
 			//	rs.mutex.Lock()
 			rs.tracker[msg.Src] = 1
 			//	rs.mutex.Unlock()
-		} else {
-			//	rs.mutex.Lock()
-			rs.tracker[msg.Src] = -1
-			//	rs.mutex.Unlock()
 		}
-	}
-	if len(rs.tracker) == rs.nodes { //we had announce from everyone
-		for index, vote := range rs.tracker {
-			if vote == 1 { //we have at least 2*rs.faulty correct encrypted shares for that index
-				//rs.mutex.Lock()
-				rs.votes[index].Vote = 1
-				//rs.mutex.Unlock()
+
+		if len(rs.tracker) == rs.nodes { //we had announce from everyone
+			for index, vote := range rs.tracker {
+				if vote == 1 { //we have at least 2*rs.faulty correct encrypted shares for that index
+					//rs.mutex.Lock()
+					rs.votes[index].Vote = 1
+					//rs.mutex.Unlock()
+				}
 			}
-		}
-		rs.votes[rs.Index()].Voted = true
-		//we say that we are done by sending our votes
-		step := &V1{SessionID: rs.sessionID, Src: rs.Index(), Votes: rs.votes}
-		if err := rs.Broadcast(step); err != nil {
-			return err
+			rs.votes[rs.Index()].Voted = true
+			//we say that we are done by sending our votes
+			step := &V1{SessionID: rs.sessionID, Src: rs.Index(), Votes: rs.votes}
+			if err := rs.Broadcast(step); err != nil {
+				return err
+			}
 		}
 	}
 	rs.mutex.Unlock()
