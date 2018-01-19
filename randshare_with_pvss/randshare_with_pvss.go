@@ -3,6 +3,7 @@ package randsharepvss
 import (
 	"bytes"
 	"errors"
+	"fmt"
 	//"time"
 
 	"encoding/binary"
@@ -30,6 +31,7 @@ func NewRandShare(n *onet.TreeNodeInstance) (onet.ProtocolInstance, error) {
 
 //Setup initializes RandShare struct, computes the private keys and the second base point based on the sessionID
 func (rs *RandShare) Setup(nodes int, faulty int, purpose string, time int64) error {
+	fmt.Printf("Node %d is connected\n", rs.Index()+1)
 
 	rs.startingTime = time
 	rs.nodes = nodes
@@ -56,6 +58,10 @@ func (rs *RandShare) Setup(nodes int, faulty int, purpose string, time int64) er
 	rs.secrets = make(map[int]abstract.Point)
 	rs.coStringReady = false
 	rs.Done = make(chan bool, 0)
+	rs.decshare = false
+	rs.encshare = false
+	rs.vot = false
+	rs.sec = false
 
 	return nil
 }
@@ -128,6 +134,7 @@ func (rs *RandShare) HandleA1(announce StructA1) error {
 		if err := rs.Broadcast(announce); err != nil {
 			return err
 		}
+
 	}
 
 	if _, ok := rs.tracker[msg.Src]; ok || !bytes.Equal(msg.SessionID, rs.sessionID) {
@@ -169,6 +176,10 @@ func (rs *RandShare) HandleA1(announce StructA1) error {
 			if err := rs.Broadcast(step); err != nil {
 				return err
 			}
+			if rs.Index() == 0 && !rs.encshare {
+				rs.encshare = true
+				fmt.Printf("\nDistributing Encrypted Shares \n")
+			}
 		}
 	}
 	rs.mutex.Unlock()
@@ -177,7 +188,10 @@ func (rs *RandShare) HandleA1(announce StructA1) error {
 
 //HandleV1 sends the decrypted shares when has received everyone's vote (means they are done storing their encrypted shares)
 func (rs *RandShare) HandleV1(step StructV1) error {
-
+	if rs.Index() == 0 && !rs.vot {
+		rs.vot = true
+		fmt.Printf("\nVoting Process\n")
+	}
 	msg := &step.V1
 
 	if !bytes.Equal(msg.SessionID, rs.sessionID) || rs.votes[msg.Src].Voted {
@@ -238,6 +252,11 @@ func (rs *RandShare) HandleV1(step StructV1) error {
 //HandleR1 stores the decrypted shares and when we have enough, recovers the secret of good nodes
 func (rs *RandShare) HandleR1(reply StructR1) error {
 
+	if rs.Index() == 0 && !rs.decshare {
+		rs.decshare = true
+		fmt.Printf("\nDistributing Decrypted Shares\n")
+	}
+
 	msg := &reply.R1
 
 	if _, ok := rs.tracker[msg.Src]; ok || !bytes.Equal(msg.SessionID, rs.sessionID) {
@@ -293,6 +312,10 @@ func (rs *RandShare) HandleR1(reply StructR1) error {
 			}
 		}
 	}
+	if rs.Index() == 0 && !rs.sec {
+		rs.sec = true
+		fmt.Printf("\nRecovering Secrets\n\n")
+	}
 	return nil
 }
 
@@ -318,7 +341,7 @@ func (rs *RandShare) Random() ([]byte, *Transcript, error) {
 		Time:      rs.startingTime,
 		X:         rs.X,
 		H:         rs.H,
-		PubPolys:  rs.pubPolys,
+		//PubPolys:  rs.pubPolys,
 		EncShares: rs.encShares,
 		DecShares: rs.decShares,
 		Votes:     rs.votes,
@@ -327,7 +350,8 @@ func (rs *RandShare) Random() ([]byte, *Transcript, error) {
 }
 
 //Verify is a method that verifies that we created the random collective string following the transcript
-func Verify(random []byte, transcript *Transcript) error {
+
+func Verifyw(random []byte, transcript *Transcript) error {
 
 	//verification of sessionID
 	sid := SessionID(transcript.Suite, transcript.Nodes, transcript.Faulty, transcript.X, transcript.Purpose, transcript.Time)
@@ -388,6 +412,45 @@ func Verify(random []byte, transcript *Transcript) error {
 	}
 
 	//everything was correct
+	return nil
+}
+
+func Verify(random []byte, transcript *Transcript) error {
+
+	sid := SessionID(transcript.Suite, transcript.Nodes, transcript.Faulty, transcript.X, transcript.Purpose, transcript.Time)
+	if !bytes.Equal(transcript.SessionID, sid) {
+		return errors.New("Wrong session identifier")
+	}
+
+	var secrets []abstract.Point
+	for id, vote := range transcript.Votes {
+		if vote.Vote > transcript.Faulty {
+			var encShareList []*pvss.PubVerShare
+			var decShareList []*pvss.PubVerShare
+			var keys []abstract.Point
+			for j, share := range transcript.DecShares[id] {
+				encShareList = append(encShareList, transcript.EncShares[id][j])
+				decShareList = append(decShareList, share)
+				keys = append(keys, transcript.X[j])
+			}
+			secret, err := pvss.RecoverSecret(transcript.Suite, nil, keys, encShareList, decShareList, transcript.Faulty+1, transcript.Nodes)
+			if err != nil {
+				return err
+			}
+			secrets = append(secrets, secret)
+		}
+	}
+	coString := transcript.Suite.Point().Null()
+	for _, secret := range secrets {
+		abstract.Point.Add(coString, coString, secret)
+	}
+	bs, err := coString.MarshalBinary()
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(bs, random) {
+		return errors.New("CoString isn't correct")
+	}
 	return nil
 }
 

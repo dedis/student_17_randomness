@@ -23,7 +23,7 @@ func main() {
 	_, _, tree := local.GenTree(nodes, true)
 	defer local.CloseAll()
 
-	//fmt.Print("RandShare starting\n")
+	fmt.Print("\nRandShare starting\n\n")
 	protocol, err := local.CreateProtocol(name, tree)
 	if err != nil {
 		log.LLvlf1("couldn't initialize %s", err)

@@ -80,7 +80,8 @@ type StructR1 struct {
 	R1             //The reply
 }
 
-//Transcript is given to a third party so that it can verify the porcess of creatino of our random srting
+//Transcript is given to a third party so that it can verify the porcess of creation of our random srting
+
 type Transcript struct {
 	SessionID []byte                            //the sessionID
 	Suite     abstract.Suite                    //The suite (rs.Suite())
@@ -91,7 +92,7 @@ type Transcript struct {
 	X         []abstract.Point                  //The public keys
 	H         abstract.Point                    //the 2nd base
 	EncShares map[int]map[int]*pvss.PubVerShare //The matrix of encrypted shares
-	PubPolys  []*share.PubPoly                  //The pubPoly of every node
+	//PubPolys  []*share.PubPoly                  //The pubPoly of every node
 	DecShares map[int]map[int]*pvss.PubVerShare //The matrix of decrypted shares
 	Votes     map[int]*Vote                     //The votes
 }
@@ -111,10 +112,14 @@ type RandShare struct {
 	pubPolys               []*share.PubPoly                  //The pubPoly of every node
 	X                      []abstract.Point                  //The public keys
 	encShares              map[int]map[int]*pvss.PubVerShare //Matrix of encrypted shares : ES_src_tgt = encShare[src][tgt]
+	decshare               bool                              //for demo
+	encshare               bool                              //for demo
 	tracker                map[int]int                       //tracker[i] can be -1 not enough enc share verified, 0 nothing received, 1 we have enough enc shares
 	votes                  map[int]*Vote                     //Indexes of good nodes is set at 1, sent when receieved an announce from everyone
+	vot                    bool                              //for demo
 	decShares              map[int]map[int]*pvss.PubVerShare //Matrix of decrypted shares : DS_src_tgt = decShare[src][tgt]
 	secrets                map[int]abstract.Point            //Recovered secrets
+	sec                    bool                              //for demo
 	coStringReady          bool                              //Is the coString available ?
 	coString               abstract.Point                    //Collective random string computed with the secrets
 	Done                   chan bool                         //Is the protocol done ?
