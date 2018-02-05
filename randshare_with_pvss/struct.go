@@ -22,7 +22,7 @@ func init() {
 	}
 }
 
-//Share is used to send the share along with its position in the matrix encShare : (Src, PubVerShare.S.I)
+//Share is a wrapper used to send a share along with the sender id, i.e., its row in the shares-matrix. Position is thus (Row, PubVerShare.S.I)
 type Share struct {
 	Row         int               //The position of the share
 	PubVerShare *pvss.PubVerShare //The share
@@ -36,13 +36,13 @@ type Vote struct {
 
 // A1 is the announce.
 type A1 struct {
-	SessionID []byte              //SessionID to verify the validity of the reply
+	SessionID []byte              //SessionID to verify the validity of the message
+	Purpose   string              //the purpose of the current ProtocolInstance
+	Time      int64               //time given by initializer to compute sessionID
 	Src       int                 //The sender
 	B         abstract.Point      //Info about pubPoly of Src
 	Commits   []abstract.Point    //Commits used with B to reconstruct pubPoly
-	Shares    []*pvss.PubVerShare //The src th row of encrypted shares
-	Purpose   string              //the purpose of the current ProtocolInstance
-	Time      int64               //time given by initializer to compute sessionID
+	Shares    []*pvss.PubVerShare //The encrypted shares or src-th node
 }
 
 //StructA1 just contains Announce and the data necessary to identify and
@@ -56,10 +56,10 @@ type StructA1 struct {
 type V1 struct {
 	SessionID []byte        //SessionID to verify the validity
 	Src       int           //The sender
-	Votes     map[int]*Vote //The votes
+	Votes     map[int]*Vote //Its votes
 }
 
-// StructR1 just contains V1 and the data necessary to identify and
+// StructV1 just contains V1 and the data necessary to identify and
 // process the message in the sda framework.
 type StructV1 struct {
 	*onet.TreeNode //The tree
@@ -70,7 +70,7 @@ type StructV1 struct {
 type R1 struct {
 	SessionID []byte   //SessionID to verify the validity of the reply
 	Src       int      //The sender
-	Shares    []*Share //The decrypted shares of node Src
+	Shares    []*Share //The decrypted shares of src-th node (src-th piece of each secret)
 }
 
 // StructR1 just contains R1 and the data necessary to identify and
@@ -80,29 +80,26 @@ type StructR1 struct {
 	R1             //The reply
 }
 
-//Transcript is given to a third party so that it can verify the porcess of creation of our random srting
-
+// Transcript is given to a third party so that it can verify the process of creation of our random srting
 type Transcript struct {
-	SessionID []byte                            //the sessionID
+	SessionID []byte                            //The sessionID
 	Suite     abstract.Suite                    //The suite (rs.Suite())
 	Nodes     int                               //Number of nodes
 	Faulty    int                               //Number of faulty nodes
 	Purpose   string                            //The purpose
 	Time      int64                             //the starting time
 	X         []abstract.Point                  //The public keys
-	H         abstract.Point                    //the 2nd base
-	EncShares map[int]map[int]*pvss.PubVerShare //The matrix of encrypted shares
-	//PubPolys  []*share.PubPoly                  //The pubPoly of every node
-	DecShares map[int]map[int]*pvss.PubVerShare //The matrix of decrypted shares
+	H         abstract.Point                    //the 2nd base point
+	EncShares map[int]map[int]*pvss.PubVerShare //The encrypted shares
 	Votes     map[int]*Vote                     //The votes
+	DecShares map[int]map[int]*pvss.PubVerShare //The decrypted shares
 }
 
 //RandShare is our protocol struct
 type RandShare struct {
-	mutex                  sync.Mutex                        //Mutex to avoid concurrency
 	*onet.TreeNodeInstance                                   //The tree of nodes
+	mutex                  sync.Mutex                        //Mutex to avoid concurrency
 	nodes                  int                               //Number of nodes
-	nPrime                 int                               //Number of "good nodes" after voting process
 	faulty                 int                               //Number of faulty nodes
 	threshold              int                               //The threshold to recover values
 	purpose                string                            //The purpose of the protocol
@@ -111,15 +108,12 @@ type RandShare struct {
 	H                      abstract.Point                    //Our second base point created with SessionID
 	pubPolys               []*share.PubPoly                  //The pubPoly of every node
 	X                      []abstract.Point                  //The public keys
-	encShares              map[int]map[int]*pvss.PubVerShare //Matrix of encrypted shares : ES_src_tgt = encShare[src][tgt]
-	decshare               bool                              //for demo
-	encshare               bool                              //for demo
+	encShares              map[int]map[int]*pvss.PubVerShare //Matrix of encrypted shares : ES_i(j) = encShare[i][j]
 	tracker                map[int]int                       //tracker[i] can be -1 not enough enc share verified, 0 nothing received, 1 we have enough enc shares
 	votes                  map[int]*Vote                     //Indexes of good nodes is set at 1, sent when receieved an announce from everyone
-	vot                    bool                              //for demo
-	decShares              map[int]map[int]*pvss.PubVerShare //Matrix of decrypted shares : DS_src_tgt = decShare[src][tgt]
+	nPrime                 int                               //Number of "good nodes" after voting process
+	decShares              map[int]map[int]*pvss.PubVerShare //Matrix of decrypted shares : DS_i(j) = decShare[i][j]
 	secrets                map[int]abstract.Point            //Recovered secrets
-	sec                    bool                              //for demo
 	coStringReady          bool                              //Is the coString available ?
 	coString               abstract.Point                    //Collective random string computed with the secrets
 	Done                   chan bool                         //Is the protocol done ?

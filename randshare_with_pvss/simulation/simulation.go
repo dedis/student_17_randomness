@@ -51,7 +51,6 @@ func (rss *RSSimulation) Run(config *onet.SimulationConfig) error {
 	}
 	rs, _ := client.(*randsharepvss.RandShare)
 	strartingTime := time.Now().Unix()
-	//err = rs.Setup(rss.Hosts, rss.Hosts/3, rss.Purpose, strartingTime)
 	err = rs.Setup(rss.Hosts, rss.Hosts/3, "Test", strartingTime)
 	if err != nil {
 		return err
@@ -63,14 +62,13 @@ func (rss *RSSimulation) Run(config *onet.SimulationConfig) error {
 
 	select {
 	case <-rs.Done:
-		log.Lvlf1("RandShare - done")
+		randM.Record()
+		bandW.Record()
 		random, transcript, err := rs.Random()
 		if err != nil {
 			return err
 		}
-		log.Lvlf1("Collective string : %x", random)
-		randM.Record()
-		bandW.Record()
+		log.Lvlf1("RandShare - done\nCollective string : %x", random)
 		log.Lvlf1("RandShare - collective randomness: ok")
 
 		verifyM := monitor.NewTimeMeasure("tver-randshare")
@@ -84,9 +82,7 @@ func (rss *RSSimulation) Run(config *onet.SimulationConfig) error {
 	case <-time.After(time.Second * time.Duration(rss.Hosts) * 10):
 		log.Print("RandShare - time out")
 	}
-
 	return nil
-
 }
 
 func main() {

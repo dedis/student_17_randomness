@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
-	//"time"
 
 	"encoding/binary"
 
@@ -13,7 +12,6 @@ import (
 	"gopkg.in/dedis/crypto.v0/share/pvss"
 	"gopkg.in/dedis/onet.v1"
 	"gopkg.in/dedis/onet.v1/crypto"
-	//"gopkg.in/dedis/onet.v1/log"
 )
 
 func init() {
@@ -31,8 +29,6 @@ func NewRandShare(n *onet.TreeNodeInstance) (onet.ProtocolInstance, error) {
 
 //Setup initializes RandShare struct, computes the private keys and the second base point based on the sessionID
 func (rs *RandShare) Setup(nodes int, faulty int, purpose string, time int64) error {
-	fmt.Printf("Node %d is connected\n", rs.Index()+1)
-
 	rs.startingTime = time
 	rs.nodes = nodes
 	rs.nPrime = 0
@@ -40,33 +36,28 @@ func (rs *RandShare) Setup(nodes int, faulty int, purpose string, time int64) er
 	rs.threshold = faulty + 1
 	rs.purpose = purpose
 	rs.X = rs.Roster().Publics()
+
+	rs.sessionID = SessionID(rs.Suite(), rs.nodes, rs.faulty, rs.X, rs.purpose, time)
+	rs.H, _ = rs.Suite().Point().Pick(nil, rs.Suite().Cipher(rs.sessionID))
+
 	rs.pubPolys = make([]*share.PubPoly, rs.nodes)
 	rs.encShares = make(map[int]map[int]*pvss.PubVerShare)
 	rs.tracker = make(map[int]int)
 	rs.votes = make(map[int]*Vote)
 	rs.decShares = make(map[int]map[int]*pvss.PubVerShare)
-
 	for i := 0; i < rs.nodes; i++ {
 		rs.encShares[i] = make(map[int]*pvss.PubVerShare)
 		rs.decShares[i] = make(map[int]*pvss.PubVerShare)
 		rs.votes[i] = &Vote{Voted: false, Vote: 0}
 	}
-
-	rs.sessionID = SessionID(rs.Suite(), rs.nodes, rs.faulty, rs.X, rs.purpose, time)
-	rs.H, _ = rs.Suite().Point().Pick(nil, rs.Suite().Cipher(rs.sessionID))
-
 	rs.secrets = make(map[int]abstract.Point)
 	rs.coStringReady = false
 	rs.Done = make(chan bool, 0)
-	rs.decshare = false
-	rs.encshare = false
-	rs.vot = false
-	rs.sec = false
 
 	return nil
 }
 
-//Start starts the protocol from node 0
+//Start initiates the protocol from node 0
 func (rs *RandShare) Start() error {
 
 	encShares, pubPoly, err := pvss.EncShares(rs.Suite(), rs.H, rs.X, nil, rs.threshold)
@@ -88,15 +79,12 @@ func (rs *RandShare) Start() error {
 	}
 
 	for j := 0; j < rs.nodes; j++ {
-		//we know they are correct, we can store them, put the tracker to 1 and update our vote
+		//we know they are correct, we can store them, put the tracker to 1
 		rs.encShares[rs.Index()][j] = encShares[j]
 		rs.tracker[rs.Index()] = 1
 	}
 	rs.mutex.Unlock()
-	if err := rs.Broadcast(announce); err != nil {
-		return err
-	}
-	return nil
+	return rs.Broadcast(announce)
 }
 
 //HandleA1 handles the announces of the session
@@ -176,10 +164,6 @@ func (rs *RandShare) HandleA1(announce StructA1) error {
 			if err := rs.Broadcast(step); err != nil {
 				return err
 			}
-			if rs.Index() == 0 && !rs.encshare {
-				rs.encshare = true
-				fmt.Printf("\nDistributing Encrypted Shares \n")
-			}
 		}
 	}
 	rs.mutex.Unlock()
@@ -188,10 +172,7 @@ func (rs *RandShare) HandleA1(announce StructA1) error {
 
 //HandleV1 sends the decrypted shares when has received everyone's vote (means they are done storing their encrypted shares)
 func (rs *RandShare) HandleV1(step StructV1) error {
-	if rs.Index() == 0 && !rs.vot {
-		rs.vot = true
-		fmt.Printf("\nVoting Process\n")
-	}
+
 	msg := &step.V1
 
 	if !bytes.Equal(msg.SessionID, rs.sessionID) || rs.votes[msg.Src].Voted {
@@ -215,7 +196,7 @@ func (rs *RandShare) HandleV1(step StructV1) error {
 	for _, vote := range rs.votes {
 		if vote.Vote > rs.faulty { //good node
 			rs.mutex.Lock()
-			rs.nPrime += 1
+			rs.nPrime++
 			rs.mutex.Unlock()
 		}
 	}
@@ -243,19 +224,11 @@ func (rs *RandShare) HandleV1(step StructV1) error {
 		}
 	}
 	reply := &R1{SessionID: rs.sessionID, Src: rs.Index(), Shares: decShares}
-	if err := rs.Broadcast(reply); err != nil {
-		return err
-	}
-	return nil
+	return rs.Broadcast(reply)
 }
 
 //HandleR1 stores the decrypted shares and when we have enough, recovers the secret of good nodes
 func (rs *RandShare) HandleR1(reply StructR1) error {
-
-	if rs.Index() == 0 && !rs.decshare {
-		rs.decshare = true
-		fmt.Printf("\nDistributing Decrypted Shares\n")
-	}
 
 	msg := &reply.R1
 
@@ -306,15 +279,11 @@ func (rs *RandShare) HandleR1(reply StructR1) error {
 				rs.mutex.Lock()
 				rs.coString = coString
 				rs.mutex.Unlock()
-				//log.LLvlf1("COSTRING RECOVERED AT NODE %d %+v", rs.Index(), coString)
+				fmt.Printf("Collective String recovered at node %d %+v\n", rs.Index()+1, coString)
 				rs.coStringReady = true
 				rs.Done <- true
 			}
 		}
-	}
-	if rs.Index() == 0 && !rs.sec {
-		rs.sec = true
-		fmt.Printf("\nRecovering Secrets\n\n")
 	}
 	return nil
 }
@@ -341,7 +310,6 @@ func (rs *RandShare) Random() ([]byte, *Transcript, error) {
 		Time:      rs.startingTime,
 		X:         rs.X,
 		H:         rs.H,
-		//PubPolys:  rs.pubPolys,
 		EncShares: rs.encShares,
 		DecShares: rs.decShares,
 		Votes:     rs.votes,
@@ -350,8 +318,7 @@ func (rs *RandShare) Random() ([]byte, *Transcript, error) {
 }
 
 //Verify is a method that verifies that we created the random collective string following the transcript
-
-func Verifyw(random []byte, transcript *Transcript) error {
+func Verify(random []byte, transcript *Transcript) error {
 
 	//verification of sessionID
 	sid := SessionID(transcript.Suite, transcript.Nodes, transcript.Faulty, transcript.X, transcript.Purpose, transcript.Time)
@@ -359,26 +326,8 @@ func Verifyw(random []byte, transcript *Transcript) error {
 		return errors.New("Wrong session identifier")
 	}
 
-	/*//verification of encrypted Shares
-	for rowID, encShareMap := range transcript.EncShares {
-		for colID, encShare := range encShareMap {
-			if err := pvss.VerifyEncShare(transcript.Suite, transcript.H, transcript.X[colID], transcript.PubPolys[rowID].Eval(colID).V, encShare); err != nil {
-				return err
-			}
-		}
-	}
-
-	//verification of decrypted shares
-	for rowID, decShareMap := range transcript.DecShares {
-		for colID, decShare := range decShareMap {
-			if err := pvss.VerifyDecShare(transcript.Suite, nil, transcript.X[colID], transcript.EncShares[rowID][colID], decShare); err != nil {
-				return err
-			}
-		}
-	}
-	*/
 	//verification of the final coString
-	//first we compute the good secrets
+	//first we compute the secrets of honest nodes according to results of vote
 	var secrets []abstract.Point
 	for id, vote := range transcript.Votes {
 		if vote.Vote > transcript.Faulty {
@@ -412,45 +361,6 @@ func Verifyw(random []byte, transcript *Transcript) error {
 	}
 
 	//everything was correct
-	return nil
-}
-
-func Verify(random []byte, transcript *Transcript) error {
-
-	sid := SessionID(transcript.Suite, transcript.Nodes, transcript.Faulty, transcript.X, transcript.Purpose, transcript.Time)
-	if !bytes.Equal(transcript.SessionID, sid) {
-		return errors.New("Wrong session identifier")
-	}
-
-	var secrets []abstract.Point
-	for id, vote := range transcript.Votes {
-		if vote.Vote > transcript.Faulty {
-			var encShareList []*pvss.PubVerShare
-			var decShareList []*pvss.PubVerShare
-			var keys []abstract.Point
-			for j, share := range transcript.DecShares[id] {
-				encShareList = append(encShareList, transcript.EncShares[id][j])
-				decShareList = append(decShareList, share)
-				keys = append(keys, transcript.X[j])
-			}
-			secret, err := pvss.RecoverSecret(transcript.Suite, nil, keys, encShareList, decShareList, transcript.Faulty+1, transcript.Nodes)
-			if err != nil {
-				return err
-			}
-			secrets = append(secrets, secret)
-		}
-	}
-	coString := transcript.Suite.Point().Null()
-	for _, secret := range secrets {
-		abstract.Point.Add(coString, coString, secret)
-	}
-	bs, err := coString.MarshalBinary()
-	if err != nil {
-		return err
-	}
-	if !bytes.Equal(bs, random) {
-		return errors.New("CoString isn't correct")
-	}
 	return nil
 }
 
